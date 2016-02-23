@@ -1,0 +1,10 @@
+tools window pos = (100, 100)
+window size = 2x
+grid type = Dotted
+Tool buttons:
+blank9 = [Rmouse,shift],[Lmouse,shift]
+add point = [Lmouse]
+delete point = [Rmouse]
+toggle line = [Rmouse,ctrl]
+select = [Lmouse,ctrl]
+move point = [Lmouse]

@@ -1,0 +1,9 @@
+tools window pos = (1490, 708)
+window size = 2.0x
+grid type = Lined
+Tool buttons:
+blank9 = [Rmouse,shift]
+delete point = [Rmouse]
+toggle line = [Lmouse],[Rmouse,ctrl]
+select = [Lmouse,ctrl]
+move point = [Lmouse]

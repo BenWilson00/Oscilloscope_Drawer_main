@@ -34,7 +34,7 @@ class Editor(object):
 						   'Dotted',
 						   'None']
 
-		xbm_generator.generate(self.scale)
+		xbm_generator.generate(self.scale, self.CWD)
 
 		self.cursors = {'arrow'    : pygame.cursors.load_xbm(CWD + '\Cursors\\arrow.xbm', CWD + '\Cursors\\arrow_mask.xbm'),
 						'click'      : pygame.cursors.load_xbm(CWD + '\Cursors\\click.xbm', CWD + '\Cursors\\click_mask.xbm'),

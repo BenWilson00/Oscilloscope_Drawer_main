@@ -145,9 +145,9 @@ def get_line_hex(string, trues, scale):
 
 	return line
 
-def generate_single(cursor, scale):
+def generate_single(cursor, scale, CWD):
 
-	filename = 'C:\Users\Ben Wilson\Desktop\python_scripts\Oscilloscope_Drawer\Cursors\\' + cursor
+	filename = CWD + '\Cursors\\' + cursor
 
 	xbm  = '#define cursor_width ' + str(int(24*scale)) + '\n'
 	xbm += '#define cursor_height ' + str(int(24*scale)) + '\n'
@@ -175,10 +175,10 @@ def generate_single(cursor, scale):
 	xbm_file.write(xbm_mask)
 	xbm_file.close()
 
-def generate(scale):
+def generate(scale, CWD):
 
 	if scale == 3:
 		scale = 2
 
 	for cursor in cursors:
-		generate_single(cursor, scale)
+		generate_single(cursor, scale, CWD)

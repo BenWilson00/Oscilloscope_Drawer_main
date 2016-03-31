@@ -1,4 +1,7 @@
 from Modules.Basic_h import *
+from os import getcwd
+
+CWD = getcwd()
 
 # Command prompt menu
 quit = False
@@ -6,16 +9,16 @@ quit = False
 while not quit:
 
 	files = []	
-	for file_ in os.listdir('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates'):
+	for file_ in os.listdir(CWD + '\Templates'):
 		if file_.endswith('.template'):
 			files.append(file_[:-9])
 
 	option = options_run(files, 0, [['d', 'to select'], ['e', 'to delete'], ['a', 'to exit']], 'Please select a template to generate a trace for:')
 
 	if option[1] == 'e':
-		os.remove('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates\\' + files[option[0]] + str('.template'))
+		os.remove(CWD + '\Templates\\' + files[option[0]] + str('.template'))
 		files = []	
-		for file_ in os.listdir('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates'):
+		for file_ in os.listdir(CWD + '\Templates'):
 			if file_.endswith('.template'):
 				files.append(file_[:-9])
 		if len(files) == 0:
@@ -42,7 +45,7 @@ while not quit:
 				GAP = 20.0
 
 		filename = str(files[option[0]]) + '.template'
-		data = open('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates\\' + filename, 'r')
+		data = open(CWD + '\Templates\\' + filename, 'r')
 
 		# Read the file
 
@@ -132,7 +135,7 @@ while not quit:
 		data.close()
 
 		filename = files[option[0]] + '.trace'
-		output = open('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Traces\\' + filename, 'w')
+		output = open(CWD + '\Traces\\' + filename, 'w')
 
 		to_write = 'unsigned char points[' + str(len(newpoints)) + '][2] = {'
 		for p in range(0, len(newpoints)):

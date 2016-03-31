@@ -1,5 +1,7 @@
 from Modules.Basic_h import *
+from os import getcwd
 
+CWD = getcwd()
 # Command prompt menu
 
 time.sleep(0.2)
@@ -12,11 +14,11 @@ trace_writer_opened = False
 
 options = ['Go to template editing program']
 
-for file_ in os.listdir('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates'):
+for file_ in os.listdir(CWD + '\Templates'):
 	options.append('Generate a trace from a template')
 	break
 
-for file_ in os.listdir('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates'):
+for file_ in os.listdir(CWD + '\Templates'):
 	options.append('Write a generated trace to the arduino program')
 	break
 

@@ -1,5 +1,8 @@
 from Modules.Basic_h import *
 from Modules.Drawer_h import *
+from os import getcwd
+
+CWD = getcwd()
 
 WIDTH = 900
 HEIGHT = 800
@@ -43,7 +46,7 @@ rainbow = False
 # Command prompt menu
 
 files_there = False
-for file_ in os.listdir('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates'):
+for file_ in os.listdir(CWD + '\Templates'):
 	files_there = True
 	break
 
@@ -77,7 +80,7 @@ while not quit_program:
 			filename = raw_input('Please enter the name of your file:\n')
 			filename += '.template'
 
-			doc = open('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates\\' + filename, 'w')
+			doc = open(CWD + '\Templates\\' + filename, 'w')
 			no_file = False
 
 		elif option[0] == 1:
@@ -85,15 +88,15 @@ while not quit_program:
 			while not return_to_menu:
 
 				files = []	
-				for file_ in os.listdir('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates'):
+				for file_ in os.listdir(CWD + '\Templates'):
 					files.append(file_[:-9])
 
 				option = options_run(files, 0, [['a', 'to quit'], ['d', 'to select'], ['e', 'to delete file']], 'Please select a file:')
 
 				if option[1] == 'e':
-					os.remove('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates\\' + files[option[0]] + str('.template'))
+					os.remove(CWD + '\Templates\\' + files[option[0]] + str('.template'))
 					files = []	
-					for file_ in os.listdir('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates'):
+					for file_ in os.listdir(CWD + '\Templates'):
 						if file_.endswith('.template'):
 							files.append(file_[:-9])
 						if len(files) == 0:
@@ -106,7 +109,7 @@ while not quit_program:
 
 				elif option[1] == 'd':
 					filename = str(files[option[0]]) + '.template'
-					data = open('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates\\' + filename, 'r')
+					data = open(CWD + '\Templates\\' + filename, 'r')
 					no_file = False
 					clear()
 					break
@@ -176,7 +179,7 @@ while not quit_program:
 				trail_length = int(lines[2][15:])
 
 				data.close()
-				doc = open('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates\\' + filename, 'w')
+				doc = open(CWD + '\Templates\\' + filename, 'w')
 				no_file = False
 
 		if not (no_file or return_to_menu):
@@ -311,7 +314,7 @@ while not quit_program:
 					to_write += ']\nspeed = %i.0\ntrail length = %i' % (int(speed), trail_length)
 
 					doc.close()
-					doc = open('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Templates\\' + filename, 'w')
+					doc = open(CWD + '\Templates\\' + filename, 'w')
 					doc.write(to_write)
 					print 'Saved to file \'' + filename + '\''
 
@@ -341,6 +344,8 @@ while not quit_program:
 
 					trace_iteration = 0
 					trace_path(points, trace_particles, trace_iteration, length, n_trace_particles, trail_length)
+					clear()
+					print 'press space to dash'
 
 				# Pause button
 				elif clicked == -5 and len(points) > 1:

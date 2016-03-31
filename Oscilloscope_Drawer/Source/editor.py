@@ -36,10 +36,13 @@ class Editor(object):
 
 		xbm_generator.generate(self.scale, self.CWD)
 
-		self.cursors = {'arrow'    : pygame.cursors.load_xbm(CWD + '\Cursors\\arrow.xbm', CWD + '\Cursors\\arrow_mask.xbm'),
-						'click'      : pygame.cursors.load_xbm(CWD + '\Cursors\\click.xbm', CWD + '\Cursors\\click_mask.xbm'),
-						'grab'       : pygame.cursors.load_xbm(CWD + '\Cursors\\grab.xbm', CWD + '\Cursors\\grab_mask.xbm'),
-						'horizontal' : pygame.cursors.load_xbm(CWD + '\Cursors\\horizontal.xbm', CWD + '\Cursors\\horizontal_mask.xbm')}
+		self.cursors = {'arrow'      : pygame.cursors.load_xbm(CWD + '\Cursors\\arrow.xbm',      CWD + '\Cursors\\arrow_mask.xbm'),
+						'click'      : pygame.cursors.load_xbm(CWD + '\Cursors\\click.xbm',      CWD + '\Cursors\\click_mask.xbm'),
+						'grab'       : pygame.cursors.load_xbm(CWD + '\Cursors\\grab.xbm',       CWD + '\Cursors\\grab_mask.xbm'),
+						'horizontal' : pygame.cursors.load_xbm(CWD + '\Cursors\\horizontal.xbm', CWD + '\Cursors\\horizontal_mask.xbm'),
+						'vertical'   : pygame.cursors.load_xbm(CWD + '\Cursors\\vertical.xbm',   CWD + '\Cursors\\vertical_mask.xbm'),
+						'diag1'      : pygame.cursors.load_xbm(CWD + '\Cursors\\diag1.xbm',      CWD + '\Cursors\\diag1_mask.xbm'),
+						'diag2'      : pygame.cursors.load_xbm(CWD + '\Cursors\\diag2.xbm',      CWD + '\Cursors\\diag1_mask.xbm')}
 
 		self.cursor = 'arrow'
 		pygame.mouse.set_visible(1)
@@ -129,7 +132,7 @@ class Editor(object):
 
 		if self.cursor == 'click': 
 			self.mouse['pos'] = add_tuple(self.mouse['pos'], (5*self.scale, 0))
-		elif self.cursor == 'horizontal':
+		elif self.cursor == 'horizontal' or self.cursor == 'vertical' or self.cursor[:4] == 'diag':
 			self.mouse['pos'] = add_tuple(self.mouse['pos'], (12*self.scale, 12*self.scale))
 
 		cursor_set = 'arrow'
@@ -176,15 +179,17 @@ class Editor(object):
 			elif self.cursor == 'click' and cursor_set == 'arrow':
 				pygame.mouse.set_pos(add_tuple(self.mouse['pos'], (1, 0)))
 
-			elif self.cursor == 'arrow' and cursor_set == 'horizontal':
+			if self.cursor == 'arrow' and (cursor_set == 'horizontal' or cursor_set == 'vertical' or cursor_set[:4] == 'diag'):
 				pygame.mouse.set_pos(subtract_tuple(self.mouse['pos'], (12*self.scale, 12*self.scale)))
 
-			elif self.cursor == 'horizontal' and cursor_set == 'arrow':
+			elif (self.cursor == 'horizontal' or self.cursor == 'vertical' or self.cursor[:4] == 'diag') and cursor_set == 'arrow':
 				pygame.mouse.set_pos(add_tuple(self.mouse['pos'], (1, 0)))
 
 			self.cursor = cursor_set
 
-		print self.cursor
+		if self.cursor == None:
+			self.cursor = 'arrow'
+
 		pygame.mouse.set_cursor(*self.cursors[self.cursor])
 
 		self.tool_actions_check_active()

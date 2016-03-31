@@ -1,23 +1,25 @@
 from Modules.Basic_h import *
+from os import getcwd
+
+CWD = getcwd()
 
 # Command prompt menu
 current = 0
 quit = False
-old_file = "C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Oscilloscope_Drawer_Old\Oscilloscope_Drawer_Old.ino"
-old_file = "C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Oscilloscope_Drawer_Copy.ino"
+old_file = 'Oscilloscope_Drawer_Old.ino'
 
 while not quit:
 	files = []	
-	for file_ in os.listdir('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Traces'):
+	for file_ in os.listdir(CWD + '\Traces'):
 		if file_.endswith('.trace'):
 			files.append(file_[:-6])
 
 	option = options_run(files, 0, [['d', 'to select'], ['e', 'to delete'], ['a', 'to exit']], 'Please select the file you want to open.')
 
 	if option[1] == 'e':
-		os.remove('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Traces\\' + files[option[0]] + str('.trace'))
+		os.remove(CWD + '\Traces\\' + files[option[0]] + str('.trace'))
 		files = []	
-		for file_ in os.listdir('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Traces'):
+		for file_ in os.listdir(CWD + '\Traces'):
 			if file_.endswith('.trace'):
 				files.append(file_[:-6])
 		if len(files) == 0:
@@ -32,7 +34,7 @@ while not quit:
 		# Write to the arduino file
 
 		filename = str(files[option[0]]) + '.trace'
-		data = open('C:\Users\Benjamin\Desktop\python_scripts\Oscilloscope_Drawer_Copy\Traces\\' + filename, 'r')
+		data = open(CWD + '\Traces\\' + filename, 'r')
 
 		points_declare = data.read()
 

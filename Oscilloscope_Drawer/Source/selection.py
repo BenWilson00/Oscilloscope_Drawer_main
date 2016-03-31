@@ -41,7 +41,14 @@ class Selection(object):
 	def get_hover(self):
 		for point in self.points:
 			if self.points[point].hover:
-				return 'horizontal'
+				if point == 'left' or point == 'right':
+					return 'horizontal'
+				elif point == 'top' or point == 'bottom':
+					return 'vertical'
+				elif point == 'topright' or point == 'bottomleft':
+					return 'diag1'	
+				elif point == 'topleft' or point == 'bottomright':
+					return 'diag2'
 
 	def draw(self, display):
 		pygame.draw.rect(display, (255, 255, 255), self.rect, 1)

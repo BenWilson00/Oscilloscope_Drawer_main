@@ -45,8 +45,6 @@ def listdir(directory):
 		files.append(file_)
 	return files
 
-
-
 class Menu(object):
 
 	def __init__(self, CWD):

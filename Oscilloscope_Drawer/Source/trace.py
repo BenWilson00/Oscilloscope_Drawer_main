@@ -7,26 +7,25 @@ from frame_selector import *
 
 class Trace(object):
 
-	def __init__(self, lines, CWD, **kwargs):
+	def __init__(self, lines, **kwargs):
 
-		self.id = False
+		self.id = 'trace'
 		self.lines = [lines[line].split('/') for line in range(1, len(lines))]
-		self.CWD = CWD
 		self.frames = []
-		self.curr_frame_n = int(lines[0][12:])
+		self.curr_frame_n = int(lines[0][14:])
 		self.z = kwargs['z'] if 'z' in kwargs else 3
 		self.hover = False
 		self.active = False
 
 	def get_cf(self):
+
 		if len(self.frames) > self.curr_frame_n:
 			return self.frames[self.curr_frame_n]
 		else:
 			return -1
 
-	def load(self, frame_rect, scale, grid_type):
+	def load(self, frame_rect, grid_type):
 
-		self.scale = scale
 		self.grid_type = grid_type
 		self.frame_rect = frame_rect
 		frame_lists = []
@@ -51,9 +50,9 @@ class Trace(object):
 					frame_split_points[frame][point - len(frame_split_points[frame])] = frame_lists[frame][point][0]
 
 		for frame in range(0, len(frame_int_lists)):
-			self.frames.append(Frame(frame, frame_int_lists[frame], frame_split_points[frame], self.frame_rect, self.scale))
+			self.frames.append(Frame(frame, frame_int_lists[frame], frame_split_points[frame], self.frame_rect))
 
-		self.frame_selector = Frame_selector(self.frames, self.CWD + '\Images\\', self.scale)
+		self.frame_selector = Frame_selector(self.frames, CWD() + '\Images\\')
 
 	def draw(self, display):
 		self.get_cf().draw(display, self.grid_type)
@@ -95,11 +94,11 @@ class Trace(object):
 	def get_action(self):
 		
 		if self.get_cf().active:
-			if self.id: return self.id + '/' + self.get_cf().get_action()
+			if self.id: return (self.id,) + self.get_cf().get_action()
 		 	else: return self.get_cf().get_action()
 
 		elif self.frame_selector.active:
-			if self.id: return self.id + '/' + self.frame_selector.get_action()
+			if self.id: return (self.id,) + self.frame_selector.get_action()
 		 	else: return self.frame_selector.get_action()
 		# for tool in self.tools:
 		# 	if self.tools[tool].Lactive or self.tools[tool].Ractive:
@@ -108,10 +107,10 @@ class Trace(object):
 
 	def add_frame(self, points, pos='end'):
 		if pos == 'end':
-			self.frames.append(Frame(len(self.frames), points, {}, self.frame_rect, self.scale))
+			self.frames.append(Frame(len(self.frames), points, {}, self.frame_rect))
 			self.frame_selector.update(new_frame=[self.frames[-1], pos])
 		else:
-			self.frames.insert(Frame(pos, points, {}, self.frame_rect, self.scale), pos)
+			self.frames.insert(Frame(pos, points, {}, self.frame_rect), pos)
 			self.frame_selector.update(new_frame=[self.frames[pos], pos])
 
 	def delete_frame(self, pos='end'):

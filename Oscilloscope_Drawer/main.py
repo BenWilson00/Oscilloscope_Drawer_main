@@ -7,8 +7,8 @@ import ctypes
 
 ctypes.windll.user32.SetProcessDPIAware()
 
-CWD = os.getcwd()
-print '\nCWD: ' + CWD + '\n'
+SETCWD(os.getcwd())
+print '\nCWD: ' + CWD() + '\n'
 
 time.sleep(0.5)
 clear()
@@ -17,7 +17,7 @@ while True:
 
 	# Handle main menu & its output
 
-	main_menu = Menu(CWD)
+	main_menu = Menu(CWD())
 
 	while main_menu.output == None:
 		main_menu.run_menu()
@@ -26,7 +26,7 @@ while True:
 
 	# Initialise program aspects
 
-	trace_file = open(CWD + '\Traces\\' + main_menu.output, 'r')
+	trace_file = open(CWD() + '\Traces\\' + main_menu.output, 'r')
 
 	lines = []
 	for line in trace_file:
@@ -34,9 +34,9 @@ while True:
 
 	trace_file.close()
 
-	trace = Trace(lines, CWD)
+	trace = Trace(lines)
 
-	editor = Editor(trace, CWD, main_menu.output)
+	editor = Editor(trace, main_menu.output)
 
 	clear()
 

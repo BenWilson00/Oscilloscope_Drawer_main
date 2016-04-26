@@ -1,0 +1,8 @@
+horizontal:(22, 22),
+diag2:(22, 22),
+diag1:(22, 22),
+cardinal:(22, 22),
+vertical:(22, 22),
+arrow:(0, 0),
+grab:(16, 0),
+click:(10, 0),

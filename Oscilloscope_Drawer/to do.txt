@@ -1,3 +1,3 @@
 mouse scrolling
-selection tool - continue
+selection tool - "selection" object actions
 look into PWM - arcs

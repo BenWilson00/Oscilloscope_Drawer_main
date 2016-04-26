@@ -7,30 +7,29 @@ from frame import *
 
 class Frame_selector(object):
 
-	def __init__(self, frames, directory, scale, **kwargs):
+	def __init__(self, frames, directory, **kwargs):
 
 		self.id = 'frame selector'
 		self.z = kwargs['z'] if 'z' in kwargs else 3
-		self.scale = scale
 		self.frames = frames
 		self.frame_sprites = []
 		self.delete_buttons = []
 		self.hover = False
 		self.active = False
-		self.surface = pygame.Surface(self.scaleup(784, 134))
+		self.surface = pygame.Surface(scaleup(784, 134))
 		self.surface_rect = self.surface.get_rect()
-		self.pos = self.scaleup(58, 636)
+		self.pos = scaleup(58, 636)
 		self.displace = 0.0
 		self.update()
 		self.directory = directory
 
 	def scaleup(self, *values):
 		if len(values) == 1 and type(values[0]) == tuple:
-			return multiply_tuple(self.scale, values[0])
+			return multiply_tuple(SCALE(), values[0])
 		elif len(values) > 1:
-			return multiply_tuple(self.scale, values)
+			return multiply_tuple(SCALE(), values)
 		else:
-			return self.scale * values[0]
+			return SCALE() * values[0]
 
 	def load(self, **kwargs):
 
@@ -40,17 +39,17 @@ class Frame_selector(object):
 
 		else:
 			for frame in range(0, len(self.frames)):
-			  	self.frame_sprites.append(Button((self.scale*frame*176+6, self.scale*15), self.frames[frame].get_mini(self.surface)))
-				self.delete_buttons.append(Button((self.scale*(frame*176+153)+6, self.scale*15), self.directory + 'remove_frame_button.png'))
+			  	self.frame_sprites.append(Button((SCALE()*frame*176+6, SCALE()*15), self.frames[frame].get_mini(self.surface)))
+				self.delete_buttons.append(Button((SCALE()*(frame*176+153)+6, SCALE()*15), self.directory + 'remove_frame_button.png'))
 				self.frame_sprites[frame].load(id='select frame '+str(frame))
-				self.delete_buttons[frame].load(scale=self.scale, id='delete frame '+str(frame))
+				self.delete_buttons[frame].load(scale=SCALE(), id='delete frame '+str(frame))
 
-			self.add_button = Button((self.scale*len(self.frames)*176+6, self.scale*15), self.directory + 'add_frame_button.png')
-			self.add_button.load(150, scale=self.scale, id='add empty frame')
+			self.add_button = Button((SCALE()*len(self.frames)*176+6, SCALE()*15), self.directory + 'add_frame_button.png')
+			self.add_button.load(150, scale=SCALE(), id='add empty frame')
 
 	def update(self, **kwargs):
 
-		self.range = self.scale*((len(self.frames)+1)*(176)+4)
+		self.range = SCALE()*((len(self.frames)+1)*(176)+4)
 
 		if self.range > self.surface_rect.width:
 			self.len_percent = float(self.range)/self.surface_rect.width
@@ -68,13 +67,13 @@ class Frame_selector(object):
 				self.frame_sprites.append(Button((0, 0), self.frames[-1].get_mini(self.surface)))
 				self.delete_buttons.append(Button((0, 0), self.directory + 'remove_frame_button.png'))
 				self.frame_sprites[-1].load(id='select frame '+str(len(self.frame_sprites)))
-				self.delete_buttons[-1].load(scale=self.scale, id='delete frame '+str(len(self.frame_sprites)))
+				self.delete_buttons[-1].load(scale=SCALE(), id='delete frame '+str(len(self.frame_sprites)))
 
 			else:
 				self.frame_sprites.insert(Button((0, 0), self.frames[kwargs['new_frame'][1]].get_mini(self.surface)), kwargs['new_frame'][1])
 				self.delete_buttons.insert(Button((0, 0), self.directory + 'remove_frame_button.png'), kwargs['new_frame'][1])
 				self.frame_sprites[kwargs['new_frame'][1]].load(id='select frame '+str(kwargs['new_frame'][1]))
-				self.delete_buttons[kwargs['new_frame'][1]].load(scale=self.scale, id='delete frame '+str(kwargs['new_frame'][1]))
+				self.delete_buttons[kwargs['new_frame'][1]].load(scale=SCALE(), id='delete frame '+str(kwargs['new_frame'][1]))
 
 			self.update_positions()
 
@@ -91,10 +90,10 @@ class Frame_selector(object):
 	def update_positions(self):
 
 		for frame in range(0, len(self.frames)):
-		  	self.frame_sprites[frame].set_pos((self.scale*(frame*176)+6-self.displace, self.scale*15))
-			self.delete_buttons[frame].set_pos((self.scale*(frame*176+153)+6-self.displace, self.scale*15))
+		  	self.frame_sprites[frame].set_pos((SCALE()*(frame*176)+6-self.displace, SCALE()*15))
+			self.delete_buttons[frame].set_pos((SCALE()*(frame*176+153)+6-self.displace, SCALE()*15))
 
-		self.add_button.set_pos((self.scale*(len(self.frames)*176)+6-self.displace, self.scale*15))
+		self.add_button.set_pos((SCALE()*(len(self.frames)*176)+6-self.displace, SCALE()*15))
 
 	def check_active(self, mouse):
 
@@ -133,13 +132,13 @@ class Frame_selector(object):
 		for i in range(0, len(self.frames)):
 
 			if self.delete_buttons[i].active:
-				return self.id + '/' + self.delete_buttons[i].get_action()
+				return (self.id, "delete frame", i,)
 
 			elif self.frame_sprites[i].active:
-				return self.id + '/' + self.frame_sprites[i].get_action()
+				return (self.id, "select frame", i,)
 
 		if self.add_button.active:
-			return self.id + '/' + self.add_button.get_action()
+			return (self.id,) + self.add_button.get_action()
 
 	def get_hover(self):
 
@@ -156,15 +155,15 @@ class Frame_selector(object):
 		for frame in range(0, len(self.frames)):
 			if self.surface_rect.colliderect(self.frame_sprites[frame].rect):
 				if frame == curr_frame:
-					pygame.draw.rect(self.surface, (0, 170, 0), ((self.scale*frame*176+2-self.displace, self.scale*15-4), (self.scale*168 + 8, self.scale*104 + 8)))
-				pygame.draw.rect(self.surface, (68, 68, 68), ((self.scale*frame*176+4-self.displace, self.scale*15-2), (self.scale*168 + 4, self.scale*104 + 4)), 1)
-				pygame.draw.rect(self.surface, (153, 153, 153), ((self.scale*frame*176+5-self.displace, self.scale*15-1), (self.scale*168 + 2, self.scale*104 + 2)), 1)
+					pygame.draw.rect(self.surface, (0, 170, 0), ((SCALE()*frame*176+2-self.displace, SCALE()*15-4), (SCALE()*168 + 8, SCALE()*104 + 8)))
+				pygame.draw.rect(self.surface, (68, 68, 68), ((SCALE()*frame*176+4-self.displace, SCALE()*15-2), (SCALE()*168 + 4, SCALE()*104 + 4)), 1)
+				pygame.draw.rect(self.surface, (153, 153, 153), ((SCALE()*frame*176+5-self.displace, SCALE()*15-1), (SCALE()*168 + 2, SCALE()*104 + 2)), 1)
 				self.frame_sprites[frame].draw(self.surface)
 				if len(self.delete_buttons) > 1: self.delete_buttons[frame].draw(self.surface)
 
 		if self.surface_rect.colliderect(self.frame_sprites[-1].rect):
-			pygame.draw.rect(self.surface, (68, 68, 68), ((self.scale*len(self.frames)*176+4-self.displace, self.scale*15-2), self.scaleup(172, 108)), 1)
-			pygame.draw.rect(self.surface, (153, 153, 153), ((self.scale*len(self.frames)*176+5-self.displace, self.scale*15-1), self.scaleup(170, 106)), 1)	
+			pygame.draw.rect(self.surface, (68, 68, 68), ((SCALE()*len(self.frames)*176+4-self.displace, SCALE()*15-2), scaleup(172, 108)), 1)
+			pygame.draw.rect(self.surface, (153, 153, 153), ((SCALE()*len(self.frames)*176+5-self.displace, SCALE()*15-1), scaleup(170, 106)), 1)	
 			self.add_button.draw(self.surface)
 
 		display.blit(self.surface, self.pos)

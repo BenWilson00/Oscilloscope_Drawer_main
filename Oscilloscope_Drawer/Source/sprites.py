@@ -44,7 +44,8 @@ class Sprite(object):
 
 		if self.pos != None: self.rect.x, self.rect.y = self.pos
 
-	def set_pos(self, pos):
+	def set_pos(self, *pos):
+		if len(pos) == 1: pos = pos[0]
 
 		if pos != None: self.rect.topleft = pos
 		
@@ -76,7 +77,7 @@ class Button(Sprite):
 		self.state = 0
 		self.type = kwargs['type'] if 'type' in kwargs else 'on_mouse_up'
 		self.active = False
-		self.hover = False
+		self.hover = kwargs['hover'] if 'hover' in kwargs else False
 		self.mouse_pos = (0, 0)
 
 	def check_active(self, mouse, **kwargs):
@@ -86,8 +87,7 @@ class Button(Sprite):
 
 		if self.clip_rect.collidepoint(mouse['pos']): 
 
-			if not self.type == 'follow':
-				self.hover = True
+			self.hover = True
 
 			if mouse['Lup']:
 
@@ -136,7 +136,7 @@ class Button(Sprite):
 					self.Ractive = False
 					self.Lactive = False
 
-		if self.active and self.type == 'follow':
+		if self.active and self.type == 'follow' and type(self) == Slider:
 				
 			if self.orientation == 1: self.update(displace=-self.mouse_pos[0] + mouse['pos'][0] - self.bar_rect.left)
 			else: self.update(displace=-self.mouse_pos[1] + mouse['pos'][1] - self.bar_rect.top)
@@ -147,7 +147,7 @@ class Button(Sprite):
 
 	def get_action(self):
 
-		if self.id: return self.id + '/click'
+		if self.id: return (self.id, 'click')
 
 	def draw(self, display, **kwargs):
 			
@@ -269,7 +269,7 @@ class MultiSprite(object):
 
 		for sprite in self.sprites:
 			if sprite.active:
-				if self.id: return self.id + '/' + sprite.get_action()
+				if self.id: return (self.id,) + sprite.get_action()
 				else: return sprite.get_action()
 				
 class Slider(Button):
@@ -353,15 +353,15 @@ class Scrollbar(MultiSprite):
 		self.type = kwargs['type'] if 'type' in kwargs else 'normal'
 		self.z = kwargs['z'] if 'z' in kwargs else 2
 
-	def load(self, scale, **kwargs):
+	def load(self, **kwargs):
 		if 'id' in kwargs: self.id = kwargs['id']
 
 		for sprite in self.sprites: 
-			sprite.pos = multiply_tuple(scale, sprite.pos)
+			sprite.pos = multiply_tuple(SCALE(), sprite.pos)
 			
-		self.sprites[0].load(scale=scale, id='decrease') if self.orientation else self.sprites[0].load(scale=scale, id='increase')
-		self.sprites[1].load(scale=scale)
-		self.sprites[2].load(scale=scale, id='increase') if self.orientation else self.sprites[2].load(scale=scale, id='decrease')
+		self.sprites[0].load(scale=SCALE(), id='decrease') if self.orientation else self.sprites[0].load(scale=SCALE(), id='increase')
+		self.sprites[1].load(scale=SCALE())
+		self.sprites[2].load(scale=SCALE(), id='increase') if self.orientation else self.sprites[2].load(scale=SCALE(), id='decrease')
 
 		self.sprites.append(Slider(self.sprites[1].rect, self.orientation, type='follow'))
 		self.sprites[-1].load(id='slider')

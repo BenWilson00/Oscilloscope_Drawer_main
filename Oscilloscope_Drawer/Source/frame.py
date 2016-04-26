@@ -2,24 +2,24 @@ import csv
 import pygame
 from basic import *
 from sprites import *
+from selection import *
 
 class Frame(object):
 
-	def __init__(self, frame_num, points, split_points, frame_rect, scale):
+	def __init__(self, frame_num, points, split_points, frame_rect):
 		self.z = 0
-		self.scale = scale
 		self.frame_num = frame_num
-		self.id = 'frame ' + str(self.frame_num)
+		self.id = 'frame'
 
 		self.points = points
 		self.split_points = split_points
 
 		self.sizes = {'normal' : (6, 4),
-					  'mini' : (2, 0.5)}
+					  			'mini' : (2, 0.5)}
 
 		self.colours = [[(0, 100, 0), (0, 200, 0)], 
-						[(0, 150, 0), (0, 255, 0)], 
-						[(60, 200, 60), (160, 255, 160)]]
+										[(0, 150, 0), (0, 255, 0)], 
+										[(60, 200, 60), (160, 255, 160)]]
 
 		self.window_pos = frame_rect.topleft
 		self.surface = pygame.Surface(frame_rect.size)
@@ -31,6 +31,11 @@ class Frame(object):
 		self.mod_key = 'None'
 		self.k_space = False
 
+		self.selection = False
+		self.start_selecting = False
+	#	self.resize_selection = False
+		self.selected = False
+
 		self.hover = False
 		self.action = False
 		self.active = False
@@ -39,7 +44,7 @@ class Frame(object):
 			
 		self.change = False
 		self.change_pos = [0, 0, 0]
-		self.selector_rect = False
+		
 		self.min_distance = {'dist' : 20/self.zoom,
 					 		 'next_point' : None,
 							 'pos' : None}
@@ -47,23 +52,20 @@ class Frame(object):
 
 #last_point = reduce(lambda x, y: max(x, y) if y < pos and x < pos else x, self.split_points)
 
-	def scaleup(self, *values):
-		if len(values) == 1 and (type(values[0]) == tuple or type(values[0])):
-			return multiply_tuple(self.scale, values[0])
-		elif len(values) > 1:
-			return multiply_tuple(self.scale, values)
-		else:
-			return self.scale * values[0]
+
 
 	def global_to_rel(self, point, **kwargs):
 		
-		return add_tuple(self.rect.topleft, multiply_tuple(1/(self.zoom*self.scale), subtract_tuple(point, self.scaleup(30, 80)), int=True)) if 'int' in kwargs else add_tuple(self.rect.topleft, multiply_tuple(1/(self.zoom*self.scale), subtract_tuple(point, self.scaleup(30, 80)), int=True))
+		if type(point) == Rect:
+			return Rect(self.global_to_rel(point.topleft), multiply_tuple(1/(self.zoom*SCALE()), point.size))
+
+		return add_tuple(self.rect.topleft, multiply_tuple(1/(self.zoom*SCALE()), subtract_tuple(point, scaleup(30, 80)), int=True)) if 'int' in kwargs else add_tuple(self.rect.topleft, multiply_tuple(1/(self.zoom*SCALE()), subtract_tuple(point, scaleup(30, 80)), int=True))
 
 	def rel_to_zoomed(self, point, **kwargs):
 
 		point = multiply_tuple(self.zoom, subtract_tuple(point, self.rect.topleft))
 		
-		point = self.scaleup(point) if 'scale' in kwargs else point 
+		point = scaleup(point) if 'scale' in kwargs else point 
 
 		return tuple([int(round(value)) for value in point]) if 'int' in kwargs else point
 
@@ -139,12 +141,23 @@ class Frame(object):
 			self.active_point = str(kwargs['active'])
 		self.change = True
 
- 	def get_points(self):
+	def set_points(self, change_dict):
+		for point in change_dict:
+			self.points[point] = change_dict[point]
+
+ 	def get_points(self, **kwargs):
+
+ 		bound_rect = self.global_to_rel(kwargs["rect"]) if "rect" in kwargs else False
 
 		return_points = {}
 
-		for point in range(0, len(self.points)):
-			return_points[point] = [self.points[point], self.rel_to_zoomed(self.points[point], scale=True)]
+		if bound_rect:
+			for point in range(0, len(self.points)):
+				if bound_rect.collidepoint(self.points[point]):
+					return_points[point] = subtract_tuple(self.points[point], bound_rect.topleft)
+		else:
+			for point in range(0, len(self.points)):
+				return_points[point] = [self.points[point], self.rel_to_zoomed(self.points[point], scale=True)]
 		
 		return return_points
 	
@@ -155,16 +168,42 @@ class Frame(object):
 	def get_action(self):
 
 		if self.active_point:
-			return self.id + '/move point ' + self.active_point
-		elif self.action:
-			return self.id + '/' + str(self.action)
+			return (self.id, self.frame_num, 'move point', self.active_point)
+		if self.action:
+			return (self.id, self.frame_num, self.action)
+		if self.selection:
+			if self.selection.active: return (self.id, self.frame_num,) + self.selection.get_action()
 
 	def check_active(self, mouse):
 
-		print self.split_points
-
 		if not (mouse['Lactive'] or mouse['Ractive']):
+			if self.start_selecting:
+				self.start_selecting = False
+				self.selection.start_selecting = False
+				self.selection.selecting = False
+				self.selection.align_points()
+
+				self.active = True
+				self.action = "toggle select type"
+				return
+
 			self.hover = False
+
+		if self.selection:
+			self.selection.check_active(mouse)
+			
+			if self.selection.active: 
+				self.active = True
+				self.action = False
+				return
+
+			if self.selection.hover: 
+				self.hover = self.selection.get_hover()
+
+			# if 'mutate selection' in self.tools:
+			# 	pass
+
+			# elif 'make selection' in self.tools:
 
 		mouse_rel = Point(self.global_to_rel(mouse['pos']))
 
@@ -180,7 +219,7 @@ class Frame(object):
 			self.action = False
 
 		elif self.action == 'grab & move':
-			self.change_pos = subtract_tuple(self.mouse_pos, mouse_rel.tup())
+			self.change_pos = subtract_tuple(self.mouse_pos, mouse_rel.tup()) + (0,)
 			return
 	
 		if mouse['Scrollup']:
@@ -240,11 +279,11 @@ class Frame(object):
 			if self.min_distance['pos']: self.hover = 'click'
 		
 		else:
-			self.min_distance =  {'dist' : 15/self.zoom,
-								 'next_point' : None,
-								 'pos' : None}
+			self.min_distance = {'dist' : 15/self.zoom,
+												 	 'next_point' : None,
+													 'pos' : None}
 
-		for tool in set(['add point', 'delete point', 'toggle line', 'select']).intersection(self.tools):
+		for tool in set(['add point', 'delete point', 'toggle line', 'make selection']).intersection(self.tools):
 			if self.check_tool_active(tool, mouse):
 				self.action = tool
 				self.active = True
@@ -253,19 +292,25 @@ class Frame(object):
 			self.active_point = False
 			self.active = False
 
-		if self.selector_rect:
-			for point in range(0, len(self.points)):
-				if self.selector_rect.collidepoint(self.points[point]):
-					self.states[point] = 1
+		# if self.selector_rect:
+		# 	for point in range(0, len(self.points)):
+		# 		if self.selector_rect.collidepoint(self.points[point]):
+		# 			self.states[point] = 1
 				
 	def update(self, kwargs):
 
 		if 'tools' in kwargs: 
 			self.tools = kwargs['tools']
+			if self.selection:
+				if 'make selection' in self.tools:
+					self.selection.selecting = True
+				if 'mutate selection' in self.tools:
+					self.selection.selecting = False
+
 		if 'pos' in kwargs and 'zoom' in kwargs: 
 			self.update_pos(zoom=kwargs['zoom'], pos=kwargs['pos'])
 		if 'selector_rect' in kwargs:
-			self.selector_rect = Rect(self.global_to_rel(kwargs['selector_rect'].topleft), multiply_tuple(1/(self.zoom*self.scale), kwargs['selector_rect'].size))
+			self.selector_rect = Rect(self.global_to_rel(kwargs['selector_rect'].topleft), multiply_tuple(1/(self.zoom*SCALE()), kwargs['selector_rect'].size))
 		if 'space' in kwargs:
 			self.k_space = kwargs['space']
 		if 'mod' in kwargs:
@@ -280,9 +325,9 @@ class Frame(object):
 			self.pos_percent = add_tuple(self.pos_percent, divide_tuple(kwargs['displace'], self.rect.size))
 
 		self.rect = self.surface.get_rect()
-		self.rect.width = round(self.rect.width/(self.zoom*self.scale))
-		self.rect.height = round(self.rect.height/(self.zoom*self.scale))
-		self.rect.topleft = multiply_tuple(multiply_tuple(0.01, self.pos_percent), subtract_tuple(multiply_tuple(1.0/self.scale, self.surface.get_rect().bottomright), self.rect.bottomright))
+		self.rect.width = round(self.rect.width/(self.zoom*SCALE()))
+		self.rect.height = round(self.rect.height/(self.zoom*SCALE()))
+		self.rect.topleft = multiply_tuple(multiply_tuple(0.01, self.pos_percent), subtract_tuple(multiply_tuple(1.0/SCALE(), self.surface.get_rect().bottomright), self.rect.bottomright))
 
 	def update_min_dist(self, mouse, mouse_rel):
 
@@ -290,14 +335,13 @@ class Frame(object):
 
 		if len(self.points) <= 2:
 			self.min_distance = {'dist' : 0,
-								 'next_point' : len(self.points),
-								 'pos' : mouse_rel.i_tup()}
+													 'next_point' : len(self.points),
+													 'pos' : mouse_rel.i_tup()}
 
 		else:
-
 			self.min_distance = {'dist' : 20/self.zoom,
-								 'next_point' : None,
-								 'pos' : None}
+													 'next_point' : None,
+													 'pos' : None}
 
 			last_split = max(self.split_points.keys(), key=int) if len(self.split_points) > 0 else 0
 
@@ -327,7 +371,7 @@ class Frame(object):
 
 				d01 = p1 - p0
 
-	 			x_acceptable = d01.y / 25.0 + 2 + int(self.scale/3.0)
+	 			x_acceptable = d01.y / 25.0 + 2 + int(SCALE()/3.0)
 
 				if (d01.x >= x_acceptable or -x_acceptable >= d01.x) and d01.y != 0:
 
@@ -369,8 +413,8 @@ class Frame(object):
 				if valid and dist <= self.min_distance['dist'] and not ('toggle line' in self.tools and ((point-1)%len(self.points) in self.split_points or (point+1)%len(self.points) in self.split_points)):
 					
 					self.min_distance = {'dist' : dist,
-										 'next_point' : point,
-										 'pos' : mouse_rel.i_tup()}
+															 'next_point' : point,
+															 'pos' : mouse_rel.i_tup()}
 
 	def move_point(self, mouse):
 		
@@ -414,14 +458,14 @@ class Frame(object):
 			line_c = p1.y + d01.y - line_m * (p1.x + d01.x)
 			norm_m = -1/line_m
 
-			dx = math.sqrt((6*self.scale)**2 / (1 + line_m**2))
+			dx = math.sqrt((6*SCALE())**2 / (1 + line_m**2))
 
 			if sign(dx) == sign(p1.x - p0.x):
 				dx = -dx
 
 			intercept = Point((p1.x + 2 * dx, p1.y + 2 * dx * line_m))
 
-			dx2 = math.sqrt((6*self.scale)**2 / (1 + norm_m**2))
+			dx2 = math.sqrt((6*SCALE())**2 / (1 + norm_m**2))
 			dy2 = dx2 * norm_m
 
 			pygame.draw.aaline(self.surface, colour, (intercept.x + dx2, intercept.y + dy2), (p1.x + dx, p1.y + dx * line_m))
@@ -433,8 +477,8 @@ class Frame(object):
 				pygame.draw.aaline(self.surface, colour, (midpoint.x + (dx + dx2)*0.6, midpoint.y + (dx * line_m + dy2)*0.6), (midpoint.x - (dx + dx2)*0.6, midpoint.y - (dx * line_m + dy2)*0.6))
 
 		elif x_acceptable >= d01.x >= -x_acceptable:
-			pygame.draw.aaline(self.surface, colour, (p1.x - 6*self.scale, p1.y - 14*sign(d01.y)*self.scale), (p1.x, p1.y - 7*sign(d01.y)*self.scale))
-			pygame.draw.aaline(self.surface, colour, (p1.x + 6*self.scale, p1.y - 14*sign(d01.y)*self.scale), (p1.x, p1.y - 7*sign(d01.y)*self.scale))
+			pygame.draw.aaline(self.surface, colour, (p1.x - 6*SCALE(), p1.y - 14*sign(d01.y)*SCALE()), (p1.x, p1.y - 7*sign(d01.y)*SCALE()))
+			pygame.draw.aaline(self.surface, colour, (p1.x + 6*SCALE(), p1.y - 14*sign(d01.y)*SCALE()), (p1.x, p1.y - 7*sign(d01.y)*SCALE()))
 			if 'cross' in kwargs:
 				midpoint = Point((p0.x, p0.y + d01.y/2))
 				pygame.draw.aaline(self.surface, colour, (midpoint.x - 7*0.6, midpoint.y - 7*0.6), (midpoint.x + 7*0.6, midpoint.y + 7*0.6))
@@ -474,10 +518,10 @@ class Frame(object):
 						self.draw_arrow_line((180, 0, 0), self.rel_to_zoomed(self.points[last_split], scale=True), self.rel_to_zoomed(self.points[point], scale=True))
 						self.draw_arrow_line((0, 255, 0), self.rel_to_zoomed(self.points[point-1], scale=True), self.rel_to_zoomed(self.points[last_split], scale=True))
 						if len(self.split_points) > 1:
-							self.draw_arrow_line(self.scaleup(20, 20, 60), self.rel_to_zoomed(self.points[point-1], scale=True), self.rel_to_zoomed(self.points[point], scale=True))
+							self.draw_arrow_line(scaleup(20, 20, 60), self.rel_to_zoomed(self.points[point-1], scale=True), self.rel_to_zoomed(self.points[point], scale=True))
 							self.draw_arrow_line((80, 80, 255), self.rel_to_zoomed(self.points[point-1], scale=True), self.rel_to_zoomed(self.points[point], scale=True), head_only=True, cross=True)
 					else:
-						pygame.draw.aaline(mini, (0, 255, 0), multiply_tuple(0.2*self.scale, self.points[point-1]), multiply_tuple(0.2*self.scale, self.points[last_split]))
+						pygame.draw.aaline(mini, (0, 255, 0), multiply_tuple(0.2*SCALE(), self.points[point-1]), multiply_tuple(0.2*SCALE(), self.points[last_split]))
 					
 					if self.min_distance['next_point'] == point and 'toggle line' in self.tools:
 						self.draw_arrow_line((255, 255, 255), self.rel_to_zoomed(self.points[point-1], scale=True), self.rel_to_zoomed(self.points[last_split], scale=True))
@@ -504,7 +548,7 @@ class Frame(object):
 					self.draw_arrow_line((0, 255, 0), self.rel_to_zoomed(self.points[point-1], scale=True), self.rel_to_zoomed(self.points[point], scale=True))
 			
 			elif not point in self.split_points:
-				pygame.draw.aaline(mini, (0, 255, 0), multiply_tuple(0.2*self.scale, self.points[point-1]), multiply_tuple(0.2*self.scale, self.points[point]))
+				pygame.draw.aaline(mini, (0, 255, 0), multiply_tuple(0.2*SCALE(), self.points[point-1]), multiply_tuple(0.2*SCALE(), self.points[point]))
 						
 	def draw(self, display, grid_type):
 		
@@ -516,36 +560,61 @@ class Frame(object):
 		 		grid_colour = multiply_tuple((self.zoom - 4.0)/10.0, (100, 100, 100), int=True)
 
 		 		for i in range(0, self.rect.width):
-		 			pygame.draw.line(self.surface, grid_colour, self.scaleup(i*self.zoom, 0), self.scaleup(i*self.zoom, self.rect.height*self.zoom))
+		 			pygame.draw.line(self.surface, grid_colour, scaleup(i*self.zoom, 0), scaleup(i*self.zoom, self.rect.height*self.zoom))
 
 		 		for i in range(0, self.rect.height):
-		 			pygame.draw.line(self.surface, grid_colour, self.scaleup(0, i*self.zoom), self.scaleup(self.rect.width*self.zoom, i*self.zoom))
+		 			pygame.draw.line(self.surface, grid_colour, scaleup(0, i*self.zoom), scaleup(self.rect.width*self.zoom, i*self.zoom))
 
 			elif grid_type == 'Dotted':
 				grid_colour = multiply_tuple((self.zoom - 4.0)/5.0, (100, 100, 100), int=True)
 				for i in range(0, self.rect.width):
 					for j in range(0, self.rect.height):
-						self.surface.set_at(map(int, self.scaleup(i*self.zoom, j*(self.zoom))), grid_colour)
-
+						self.surface.set_at(map(int, scaleup(i*self.zoom, j*(self.zoom))), grid_colour)
 
 		if len(self.points) > 0: self.draw_lines()
 
 	 	for point in range(0, len(self.points)):
 	 		if self.rect.collidepoint(self.points[point]):
-				pygame.draw.circle(self.surface, self.colours[self.states[point]][0], self.rel_to_zoomed(self.points[point], int=True, scale=True), int(self.sizes['normal'][0]*self.scale))
-				pygame.draw.circle(self.surface, self.colours[self.states[point]][1], self.rel_to_zoomed(self.points[point], int=True, scale=True), int(self.sizes['normal'][1]*self.scale))
+				pygame.draw.circle(self.surface, self.colours[self.states[point]][0], self.rel_to_zoomed(self.points[point], int=True, scale=True), int(self.sizes['normal'][0]*SCALE()))
+				pygame.draw.circle(self.surface, self.colours[self.states[point]][1], self.rel_to_zoomed(self.points[point], int=True, scale=True), int(self.sizes['normal'][1]*SCALE()))
 
 		display.blit(self.surface, self.window_pos)
 
+		if self.selection:
+			self.selection.draw(display)
+
 	def get_mini(self, display):
 
-		mini = pygame.Surface(self.scaleup(168, 104))
+		mini = pygame.Surface(scaleup(168, 104))
 		for point in self.points:
-			pygame.draw.circle(mini, self.colours[0][0], multiply_tuple(0.2*self.scale, tuple(point), int=True), int(self.sizes['mini'][0]*self.scale))
-			pygame.draw.circle(mini, self.colours[0][1], multiply_tuple(0.2*self.scale, tuple(point), int=True), int(self.sizes['mini'][1]*self.scale))
+			pygame.draw.circle(mini, self.colours[0][0], multiply_tuple(0.2*SCALE(), tuple(point), int=True), int(self.sizes['mini'][0]*SCALE()))
+			pygame.draw.circle(mini, self.colours[0][1], multiply_tuple(0.2*SCALE(), tuple(point), int=True), int(self.sizes['mini'][1]*SCALE()))
 	
 		self.draw_lines(mini)
 		return mini
+
+	def make_selection(self, mouse):
+
+		if self.start_selecting:
+			self.selection.set_start_size(mouse['pos'])
+
+		else:
+			self.start_selecting = True
+			self.selection = Selection(mouse['pos'], Rect(self.window_pos, scaleup(self.rect.size)), CWD() + '\Images\Selection\\', z=8, id='selection')
+
+	def update_selection(self, update_type, point, mouse, *args):
+
+		if update_type == "change selection":
+			self.selection.mutate(point, mouse, {})
+
+		if update_type == "mutate":
+			if not self.selection.points_in_rect:
+				points_in_rect = self.get_points(rect = self.selection.rect)
+				new_points_in_rect = self.selection.mutate(point, mouse, points_in_rect)
+			else:
+				new_points_in_rect = self.selection.mutate(point, mouse)
+
+			self.set_points( { key : add_tuple(new_points_in_rect[key], self.global_to_rel(self.selection.rect.topleft)) for key in new_points_in_rect})
 
 	def check_tool_active(self, tool, mouse):
 
@@ -578,7 +647,7 @@ class Frame(object):
 		elif tool == 'toggle line' and mouse_down and self.min_distance['pos']:
 			return True
 
-		elif tool == 'select' and mouse_active and self.rect.collidepoint(self.global_to_rel(mouse['pos'])):
+		elif tool == 'make selection' and mouse_active and self.rect.collidepoint(self.global_to_rel(mouse['pos'])):
 			return True
 
 		# 

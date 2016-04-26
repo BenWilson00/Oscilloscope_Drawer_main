@@ -1,6 +1,32 @@
 import time, subprocess, platform, msvcrt, sys, math
 from point import *
 
+SCALE_VALUE = 1.0
+
+def SCALE():
+	return SCALE_VALUE
+
+def SETSCALE(value):
+	global SCALE_VALUE
+	SCALE_VALUE = value
+
+CWD_VALUE = 1.0
+
+def CWD():
+	return CWD_VALUE
+
+def SETCWD(value):
+	global CWD_VALUE
+	CWD_VALUE = value
+
+def scaleup(*values):
+	if len(values) == 1 and (type(values[0]) == tuple or type(values[0])):
+		return multiply_tuple(SCALE(), values[0])
+	elif len(values) > 1:
+		return multiply_tuple(SCALE(), values)
+	else:
+		return SCALE() * values[0]
+
 def get_input(*args):
 	userResponse = ''
 	while userResponse not in args and userResponse not in args[-1]:
@@ -68,11 +94,11 @@ def divide_tuple(arg1, arg2, **kwargs):
 
 		return return_tup
 		
-	elif type(arg1) != tuple:
+	elif type(arg2) != tuple:
 		return_tup = ()
 
-		for value in arg2:
-			multiplied = int(round(arg1/value)) if 'int' in kwargs else arg1/float(value)
+		for value in arg1:
+			multiplied = int(round(value/arg2)) if 'int' in kwargs else float(value)/float(arg2)
 			return_tup += (multiplied,)
 
 		return return_tup

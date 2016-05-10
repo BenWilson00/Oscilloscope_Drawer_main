@@ -5,6 +5,28 @@ from sprites import *
 from basic import *
 from tools_window import *
 
+
+
+
+
+
+
+
+
+
+###############
+# Undo & Redo
+###############
+
+
+
+
+
+
+
+
+
+
 class Editor(object):
 
 	def __init__(self, trace, name):
@@ -23,6 +45,9 @@ class Editor(object):
 		self.zoom = 1.0
 		self.screen_pos = 0
 		self.display = pygame.display.set_mode((self.width, self.height))
+
+		self.whitewash = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+		self.whitewash.fill((255, 255, 255, 120))
 		
 		self.large_font = pygame.font.Font('C:\Windows\Fonts\\calibri.ttf', int(18*SCALE()))
 		self.med_font = pygame.font.Font('C:\Windows\Fonts\\calibri.ttf', int(14*SCALE()))
@@ -57,9 +82,13 @@ class Editor(object):
 		self.action = 'None'
 		self.action_time = 0
 		self.follow_mouse = [False]
+		self.input_req = {"Action" : False,
+											"Allowlist" : [],
+											"NoDrawlist" : []}
 
 		self.selected = False
 		self.selecting = False
+		self.copy_selection = False
 
 		self.timedown_vs_speed_pairs = [[0 , SCALE()],
 																		[10, 0],
@@ -108,15 +137,6 @@ class Editor(object):
 
 		self.elements.sort(key=lambda x: x.z)
 
-		# print [i.id for i in self.elements]
-
-	# def set_action(self, action):
-
-	# 	if _bool:
-	# 		if self.action == 'None':
-	# 			self.action = action 
-	# 	elif self.action == action:
-	# 		self.action = 'None'
 
 	def check_active(self):
 
@@ -127,10 +147,10 @@ class Editor(object):
 		cursor_set = 'arrow'
 
 		for obj in reversed(self.elements):
-			if self.follow_mouse[0] == obj.id or not self.follow_mouse[0]:
+			if self.follow_mouse[0] == obj.id or not self.follow_mouse[0] and ((not self.input_req["Action"]) or obj.id in self.input_req["Allowlist"]):
 				obj.check_active(self.mouse)
 				
-				if obj.hover:
+				if obj.hover and cursor_set == 'arrow':
 					cursor_set = obj.get_hover()
 
 				if obj.active:
@@ -170,6 +190,7 @@ class Editor(object):
 
 		self.tool_actions_check_active()
 
+
 	def update_states(self):
 
 		self.settings['tools window pos'] = self.tools_window.rect.topleft
@@ -186,10 +207,14 @@ class Editor(object):
 			
 		self.trace.update(zoom=self.zoom, pos=self.pos_percent, tools=self.active_tools, space=self.k_space, mod=self.mod_key)
 
-		# if self.selecting:
-		# 	self.trace.update(selector_rect=self.selection.rect)
+		if self.input_req["Action"]:
+			self.trace.update(input_req=self.input_req["Action"])
+
+		elif "action required text" in self.texts:
+			self.texts["action required text"].expired = True
 
 		self.info_text_update()
+
 
 	def check_speed(self, clicktime):
 		
@@ -199,9 +224,9 @@ class Editor(object):
 
 		return 6*SCALE()
 
+
 	def enforce_action(self):
 		cf = self.trace.get_cf()
-
 
 		# scrollbar management
 
@@ -289,7 +314,7 @@ class Editor(object):
 
 
 			elif self.action[-1] == 'add point':
-				cf.add_point(cf.min_distance['next_point'], cf.min_distance['pos'])
+				cf.add_point(cf.min_distance['next_point'], cf.min_distance['pos'], True)
 
 
 			elif self.action[-1] == 'toggle line':
@@ -298,24 +323,48 @@ class Editor(object):
 
 			elif self.action[-1] == 'make selection':
 				cf.make_selection(self.mouse)
-				self.follow_mouse = self.action 
+				self.follow_mouse = self.action
+
+
+			elif self.action[-1] == 'mutate selection':
+				if any(len(i) > 0 for i in self.tool_buttons['mutate selection']):
+					self.tools_window.update_tool_buttons(self.tool_buttons['mutate selection'][0][0], 'make selection', self.tool_buttons['mutate selection'][0][1] if len(self.tool_buttons['mutate selection'][0]) > 1 else 'None')
 
 
 			elif self.action[-3] == 'selection':
 
-				cf.update_selection(self.action[-1], self.action[-2], self.mouse)
+				cf.update_selection(self.action[-1], point=self.action[-2], mouse=self.mouse)
 				self.follow_mouse = self.action + ('until click stops',)
 
 
+			elif self.action[-1] == "end paste":
+
+				cf.add_point(cf.min_distance['next_point'], [self.copy_selection.points_in_rect[key] for key in sorted(self.copy_selection.points_in_rect)])
+
+				cf.selection = self.copy_selection.copy()
+
+				cf.selection.points_in_rect = {}
+
+				i = 0
+				for key in sorted(self.copy_selection.points_in_rect):
+
+					cf.selection.points_in_rect[cf.min_distance['next_point'] + i] = self.copy_selection.points_in_rect[key]
+					i += 1
+
+				self.input_req = {"Action" : False,
+													"Allowlist" : [],
+													"NoDrawlist" : []}
+				cf.active = False
+				cf.action = False
+				self.trace.update(input_req = False)
+
 			elif self.action[-1] == 'toggle select type':
-				
-				if 'make selection' in self.tool_buttons:
+
+				if any(self.mod_key in i for i in self.tool_buttons['make selection']) or (self.mod_key == "None" and any(len(i) == 1 for i in self.tool_buttons['make selection'])):
 					self.tools_window.update_tool_buttons(self.tool_buttons['make selection'][0][0], 'mutate selection')
 
-				elif 'mutate selection' in self.tool_buttons:
+				elif any(self.mod_key in i for i in self.tool_buttons['mutate selection']) or (self.mod_key == "None" and any(len(i) == 1 for i in self.tool_buttons['mutate selection'])):
 					self.tools_window.update_tool_buttons(self.tool_buttons['mutate selection'][0][0], 'make selection')
-
-				print self.tool_buttons
 
 
 			elif self.action[-1] in ('grab & move', 'scroll up', 'scroll down', 'scroll right', 'scroll left', 'zoom in', 'zoom out'):
@@ -373,18 +422,20 @@ class Editor(object):
 				self.follow_mouse = ('tools window', 'slider', 'until click stops')
 
 
-		# manage miscellaneous buttons
+		# manage toolbar buttons
 
 
 		if self.action[0] == 'deselect' and cf.selection:
 			cf.selection = False
+			if any(len(i) > 0 for i in self.tool_buttons['mutate selection']):
+				self.tools_window.update_tool_buttons(self.tool_buttons['mutate selection'][0][0], 'make selection', self.tool_buttons['mutate selection'][0][1] if len(self.tool_buttons['mutate selection'][0]) > 1 else 'None')
 
 
 
-		elif self.action[0] == 'grid button':
-			self.buttons['grid button'].cycle()
+		elif self.action[0] == 'grid':
+			self.buttons['grid'].cycle()
 
-			self.settings['grid type'] = self.grid_types[self.buttons['grid button'].curr_image]
+			self.settings['grid type'] = self.grid_types[self.buttons['grid'].curr_image]
 			self.trace.grid_type = self.settings['grid type']
 
 			text = 'Grid type is now ' + self.settings['grid type']
@@ -393,11 +444,44 @@ class Editor(object):
 
 
 
-		elif self.action[0] == 'save button':
+		elif self.action[0] == 'save':
 			self.trace.save_file(CWD() + '\Traces\\' + self.name, self.name)
 
 
 
+		elif self.action[0] == 'cut':
+			self.copy_selection = cf.update_selection("cut", mouse=self.mouse)
+
+
+		elif self.action[0] == 'copy':
+			self.copy_selection = cf.selection.copy()
+
+
+		elif self.action[0] == 'paste':
+			if self.copy_selection:
+				if cf.selection:
+					cf.selection = False
+
+				self.input_req = {"Action" : "paste",
+													"Allowlist" : ["trace", "up scrollbar", "across scrollbar", "zoom scrollbar", "action required text", "zoom text", "mouse x pos text", "mouse y pos text", "frame x pos text", "frame y pos text"],
+													"NoDrawlist" : ["tools window"]}
+
+				self.texts["action required text"] = Text(self.med_font, "Please select a line to paste onto", (3*SCALE(), 53*SCALE()), lifetime = None)
+
+
+		elif self.action[0] == 'help':
+
+			for button in self.buttons:
+				self.texts[button] = Text(self.small_font, button, self.buttons[button].rect.bottomleft)
+
+			for button in self.tools_window.tools:
+				if button[:5] != "blank": 
+					if self.tools_window.tools[button].tool_no % 2: self.texts[button] = Text(self.small_font, button, add_tuple(self.tools_window.rect.topleft, self.tools_window.tools[button].rect.bottomleft, (0, -SCALE()*10)), z=11, fit_rect=self.tools_window.rect, only_show_in_bounding_rect=True)
+					else: self.texts[button] = Text(self.small_font, button, add_tuple(self.tools_window.rect.topleft, self.tools_window.tools[button].rect.topleft), z=11, fit_rect=self.tools_window.rect, only_show_in_bounding_rect=True)
+
+
+
+		
 		point_pos_update = False
 		for text in self.texts:
 			if text[:9] == 'point pos':
@@ -422,6 +506,7 @@ class Editor(object):
 				for point in points:
 					self.texts['point pos ' + str(point)] = Text(self.med_font, str(point) + ': ' + str(tuple(points[point][0])), add_tuple(self.trace_rect.topleft, points[point][1]), lifetime=lifetime, fit_rect = self.trace_rect)
 
+
 	def events_update(self):
 
 		events = pygame.event.get()
@@ -436,6 +521,8 @@ class Editor(object):
 
 		for event in events:
 			if event.type == pygame.QUIT:
+				if any(len(i) > 0 for i in self.tool_buttons['mutate selection']):
+					self.tools_window.update_tool_buttons(self.tool_buttons['mutate selection'][0][0], 'make selection', self.tool_buttons['mutate selection'][0][1] if len(self.tool_buttons['mutate selection'][0]) > 1 else 'None')
 				self.local_settings_write()
 				exit(0)
 
@@ -510,7 +597,20 @@ class Editor(object):
 
 		# draw elements in order
 		
-		for obj in self.elements: obj.draw(self.display)
+		if self.input_req["Action"]:
+			for obj in self.elements: 
+				if obj.id not in self.input_req["NoDrawlist"]:
+					obj.draw(self.display)
+
+			self.display.blit(self.whitewash, (0, 0))
+
+			for obj in self.elements: 
+				if obj.id not in self.input_req["NoDrawlist"] and obj.id in self.input_req["Allowlist"]:
+					obj.draw(self.display)
+
+		else:
+			for obj in self.elements: 
+				obj.draw(self.display)
 
 		pygame.display.update()
 
@@ -632,25 +732,33 @@ class Editor(object):
 										   scrollbar_frames.id : scrollbar_frames}
 
 	def buttons_init(self, directory):
-		self.buttons = {'save button' : Button((4*SCALE(), 4*SCALE()), directory + 'save_button.png'),
-										'grid button' : Cyclic_Button((48*SCALE(), 4*SCALE()), self.grid_types.index(self.settings['grid type']), directory + 'grid_button_1.png', directory + 'grid_button_2.png', directory + 'grid_button_3.png'),
-										'show point pos' : Button((854*SCALE(), 4*SCALE()), directory + 'show_point_pos_button.png'),
-										'deselect' : Button((92*SCALE(), 4*SCALE()), directory + 'deselect_button.png')}
+		self.buttons = {'save' : Button((4*SCALE(), 4*SCALE()), directory + 'save_button.png'),
+										'grid' : Cyclic_Button((48*SCALE(), 4*SCALE()), self.grid_types.index(self.settings['grid type']), directory + 'grid_button_1.png', directory + 'grid_button_2.png', directory + 'grid_button_3.png'),
+										'deselect' : Button((92*SCALE(), 4*SCALE()), directory + 'deselect_button.png'),
+										'cut' : Button((136*SCALE(), 4*SCALE()), directory + 'cut_button.png'),
+										'copy' : Button((180*SCALE(), 4*SCALE()), directory + 'copy_button.png'),
+										'paste' : Button((224*SCALE(), 4*SCALE()), directory + 'paste_button.png'),
+										'help' : Button((810*SCALE(), 4*SCALE()), directory + 'help_button.png'),
+										'show point pos' : Button((854*SCALE(), 4*SCALE()), directory + 'show_point_pos_button.png') }
 		
 		for button in self.buttons:
 			self.buttons[button].load(id=button, scale=SCALE())
 
 	def info_text_update(self):
 	
-		pop_lst = []
+		del_lst = []
 
 		for text in self.texts:
 			self.texts[text].age()
 			if self.texts[text].expired == True:
-				pop_lst.append(text)
 
-		for text in pop_lst:
-			self.texts.pop(text)
+				del_lst.append(text)
+
+			if not self.texts[text].id:
+				self.texts[text].id = text
+
+		for text in del_lst:
+			del self.texts[text]
 
 		self.texts['zoom text'] = Text(self.small_font, str(self.zoom)[:4], (0, 601*SCALE()), background=False, lifetime=None)
 		self.texts['frame x pos text'] = Text(self.small_font, 'X: ' + str(self.trace.get_cf().rect.topleft[0])[:4], (0, 610*SCALE()), background=False, lifetime=None)
@@ -658,11 +766,11 @@ class Editor(object):
 
 		if self.trace_rect.collidepoint(self.mouse['pos']): 
 			self.mouse_frame_pos = self.trace.global_to_rel((self.mouse['pos']))
-			self.texts['mouse pos x text'] = Text(self.small_font, 'X: ' + str(int(round(self.mouse_frame_pos[0]))), (871*SCALE(), 604*SCALE()), background=False, lifetime=None)
-			self.texts['mouse pos y text'] = Text(self.small_font, 'Y: ' + str(int(round(self.mouse_frame_pos[1]))), (871*SCALE(), 616*SCALE()), background=False, lifetime=None)
+			self.texts['mouse x pos text'] = Text(self.small_font, 'X: ' + str(int(round(self.mouse_frame_pos[0]))), (871*SCALE(), 604*SCALE()), background=False, lifetime=None)
+			self.texts['mouse y pos text'] = Text(self.small_font, 'Y: ' + str(int(round(self.mouse_frame_pos[1]))), (871*SCALE(), 616*SCALE()), background=False, lifetime=None)
 		elif 'mouse pos x text' in self.texts:
-			self.texts.pop('mouse pos x text')
-			self.texts.pop('mouse pos y text')
+			self.texts.pop('mouse x pos text')
+			self.texts.pop('mouse y pos text')
 
 	def tool_actions_check_active(self):
 

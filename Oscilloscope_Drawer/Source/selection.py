@@ -8,29 +8,45 @@ class Selection(object):
 
 		self.z = kwargs['z'] if 'z' in kwargs else 8
 		if 'id' in kwargs: self.id = kwargs['id']
-		self.bounding_rect = bounding_rect
-		self.rect = Rect((pos), (0, 0))
-		self.pos = pos
-		self.dash_size = 2 * SCALE()
+		self.filepath = filepath
 
+		self.bounding_rect = bounding_rect
+		self.pos = pos
+
+		self.dash_size = 2 * SCALE()
+		
 		self.hover = False
 		self.active = False
 
-		self.selecting = True
-		self.start_selecting = True
-		self.mutating = False
+		if not 'copy' in kwargs:
 
-		self.points_in_rect = False
+			self.rect = Rect((pos), (0, 0))
+			
+			self.selecting = True
+			self.start_selecting = True
+
+			self.points_in_rect = False
+
+		else:
+
+			rect_dimensions, self.selecting, self.points_in_rect, self.id = kwargs['copy']
+
+			self.rect = Rect(self.bounding_rect.topleft, rect_dimensions)
+
+			self.start_selecting = False
 
 		self.points = { key : Button((0, 0), filepath + 'point.png', type = "follow") 
-											 for key in ("mover", "topleft",     "top",     "topright", 
-																						"left",                      "right",
-																						"bottomleft", "bottom", "bottomright") }
+										 for key in ("mover", "topleft",     "top",     "topright", 
+																					"left",                      "right",
+																					"bottomleft", "bottom", "bottomright") }
 
 		for point in self.points:
 			self.points[point].load('convert_alpha', id=point, scale=SCALE())
 
 		self.align_points()
+
+	def copy(self):
+		return Selection(self.rect.topleft, self.bounding_rect, self.filepath, copy=(self.rect.size, self.selecting, self.points_in_rect, self.id))
 
 	def align_points(self):
 
@@ -47,12 +63,25 @@ class Selection(object):
 	def update(self, **kwargs):
 
 		if 'rect' in kwargs: self.rect = kwargs['rect']
-		if 'selecting' in kwargs: self.selecting = kwargs['selecting']			
+		if 'selecting' in kwargs: self.selecting = kwargs['selecting']	
+		if 'points_in_rect' in kwargs:
+			if self.points_in_rect:
+				del_lst = []
+
+				for point in self.points_in_rect:
+					if point in kwargs['points_in_rect']:
+						self.points_in_rect[point] = kwargs['points_in_rect'][point]
+					else:
+						del_lst.append(point)
+
+				for point in del_lst:
+					del self.points_in_rect[point]
+
+			else:
+				self.points_in_rect = kwargs['points_in_rect']
 	
 	def check_active(self, mouse):
 
-		if not self.mutating: self.points_in_rect = False
-		else: self.mutating = False
 		self.hover = False
 		self.active = False
 
@@ -93,11 +122,8 @@ class Selection(object):
 			self.rect.height = self.pos[1] - mouse[1]
 			self.rect.top = mouse[1]
 
-	def mutate(self, change_point, mouse, points_in_rect=False):
+	def mutate(self, change_point, mouse):
 
-		self.mutating = True
-		if points_in_rect: self.points_in_rect = points_in_rect
-		
 		old_rect_size = self.rect.size
 		if self.rect.height > 0:
 			
@@ -204,26 +230,3 @@ class Selection(object):
 			for point in self.points:
 				self.points[point].draw(display)
 
-	# def update(self, **kwargs):
-
-	# 	if 'rect' in kwargs: self.rect = kwargs['rect']
-	# 	elif 'mouse' in kwargs:
-
-	# 		mouse = list(kwargs['mouse'])
-	# 		if mouse[0] > self.pos[0]:
-	# 			mouse[0] = min(self.bounding_rect.right, mouse[0])
-	# 			self.rect.width = mouse[0] - self.pos[0]
-	# 			self.rect.left = self.pos[0]
-	# 		else: 
-	# 			mouse[0] = max(self.bounding_rect.left, mouse[0])
-	# 			self.rect.width = self.pos[0] - mouse[0]
-	# 			self.rect.left = mouse[0]
-
-	# 		if mouse[1] > self.pos[1]:
-	# 			mouse[1] = min(self.bounding_rect.bottom, mouse[1])
-	# 			self.rect.height = mouse[1] - self.pos[1]
-	# 			self.rect.top = self.pos[1]
-	# 		else: 
-	# 			mouse[1] = max(self.bounding_rect.top, mouse[1])
-	# 			self.rect.height = self.pos[1] - mouse[1]
-	# 			self.rect.top = mouse[1]

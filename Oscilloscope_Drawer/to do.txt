@@ -1,3 +1,4 @@
+
 mouse scrolling
-selection tool - "selection" object actions
+selection tool - done 'cut', now 'paste' with points
 look into PWM - arcs

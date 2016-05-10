@@ -18,8 +18,15 @@ class Sprite(object):
 		if 'id' in kwargs: self.id = kwargs['id']
 
 		if type(self.filepath) == str:
-			if alpha == 'convert_alpha': self.image = pygame.image.load(self.filepath).convert_alpha()
-			else: self.image = pygame.image.load(self.filepath).convert()
+			try:
+				if alpha == 'convert_alpha': self.image = pygame.image.load(self.filepath).convert_alpha()
+				else: self.image = pygame.image.load(self.filepath).convert()
+			except:
+				self.image = pygame.Surface(scaleup(12, 12))
+				self.image.fill((255, 255, 255))
+				pygame.draw.line(self.image, (55, 55, 55), scaleup(4, 4), scaleup(8, 8), 3)
+				pygame.draw.line(self.image, (55, 55, 55), scaleup(8, 4), scaleup(4, 8), 3)
+
 		elif type(self.filepath) == pygame.Surface:
 			self.image = self.filepath
 
@@ -33,8 +40,15 @@ class Sprite(object):
 	def update_image(self, image, alpha=255):
 
 		if type(image) == str:
-			if alpha == 'convert_alpha': self.image = pygame.image.load(self.filepath).convert_alpha()
-			else: self.image = pygame.image.load(self.filepath).convert()
+			try:
+				if alpha == 'convert_alpha': self.image = pygame.image.load(self.filepath).convert_alpha()
+				else: self.image = pygame.image.load(self.filepath).convert()
+			except:
+				self.image = pygame.Surface(scaleup(12, 12))
+				self.image.fill((255, 255, 255))
+				pygame.draw.line(self.image, (55, 55, 55), scaleup(4, 4), scaleup(8, 8), 3)
+				pygame.draw.line(self.image, (55, 55, 55), scaleup(8, 4), scaleup(4, 8), 3)
+
 		elif type(image) == pygame.Surface:
 			self.image = image
 
@@ -374,7 +388,6 @@ class Text(object):
  		self.z = kwargs['z'] if 'z' in kwargs else 9
  		self.font = font
  		self.text = text
- 		self.pos = pos
 		self.hover = False
  		self.active = False
 
@@ -383,7 +396,8 @@ class Text(object):
  		self.lifetime = kwargs['lifetime'] if 'lifetime' in kwargs else 50
  		self.align_right = kwargs['align_right'] if 'align_right' in kwargs else False
  		self.fit_rect = kwargs['fit_rect'] if 'fit_rect' in kwargs else False
- 
+		self.only_show_in_bounding_rect = kwargs['only_show_in_bounding_rect'] if 'only_show_in_bounding_rect' in kwargs else False 
+
  		self.expired = False
 
  		if self.length == 0:
@@ -414,9 +428,9 @@ class Text(object):
 	 			j += 1
 
 	 	if len(self.lines) > 1: 
-	 		self.rect = Rect((0, 0), (self.length + self.height/1.5, (self.height + 1)*len(self.lines) + 4))
+	 		self.rect = Rect(pos, (self.length + self.height/1.5, (self.height + 1)*len(self.lines) + 4))
 	 	else: 
-	 		self.rect = Rect((0, 0), (self.font.size(self.text)[0] + self.height/1.5, self.height + 5))
+	 		self.rect = Rect(pos, (self.font.size(self.text)[0] + self.height/1.5, self.height + 5))
 
 	 	if self.background:
 	 		self.fsurface = pygame.Surface(self.rect.size)
@@ -441,7 +455,10 @@ class Text(object):
 
  		bounding_rect = display.get_rect() if self.fit_rect == False else self.fit_rect
 
- 		self.draw_pos = self.pos
+ 		if self.only_show_in_bounding_rect and not bounding_rect.contains(self.rect):
+ 			return
+
+ 		self.draw_pos = self.rect.topleft
 
 		if self.align_right:
  			self.draw_pos = (self.draw_pos[0]-self.rect.width, self.draw_pos[1])

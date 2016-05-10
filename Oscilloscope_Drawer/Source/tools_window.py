@@ -46,7 +46,7 @@ class Tools_Window(object):
 		self.rect = self.surface.get_rect()
 		self.rect.topleft = self.pos
 		self.header_rect = Rect((0, 0), (self.rect.width, (self.header_text.rect.height + 2)/SCALE()))
-		self.header_text.pos = ((self.rect.width - self.header_text.rect.width)/2.0, self.header_rect.height/2)	
+		self.header_text.rect.topleft = ((self.rect.width - self.header_text.rect.width)/2.0, self.header_rect.height/2)	
 		self.scrollbar = Scrollbar((self.row_length * 34 + 2, self.header_rect.height + 2), 0, Button((0, 0), directory + 'scrollbar_arrow.png', type='on_mouse_down'),
 																																												   Sprite((0, 28), directory + 'scrollbar_tool_bar.png'),
 																																												   Button((0, self.col_length * 34 - 26), directory + 'scrollbar_arrow.png', type='on_mouse_down'))
@@ -165,9 +165,10 @@ class Tools_Window(object):
 		if sorted(list(tools)) in self.allowed_tool_combinations: return True
 		return False
 
-	def update_tool_buttons(self, mouse, tool):
+	def update_tool_buttons(self, mouse, tool, mod = False):
 
-		combination = [mouse, self.mod_key] if self.mod_key != 'None' else [mouse]
+		if not mod: mod = self.mod_key
+		combination = [mouse, mod] if mod != 'None' else [mouse]
 
 		for tool2 in self.tool_buttons:
 			if combination in self.tool_buttons[tool2] and not self.check_multiple_tools_allowed(tool, tool2):

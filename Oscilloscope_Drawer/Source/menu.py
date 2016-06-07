@@ -45,6 +45,7 @@ def listdir(directory):
 		files.append(file_)
 	return files
 
+
 class Menu(object):
 
 	def __init__(self, CWD):
@@ -73,7 +74,7 @@ class Menu(object):
 
 				return 0
 
-	def create_file(self, name, directory, overwrite = False, write='points = [[]]'):
+	def create_file(self, name, directory, overwrite = False, write='curr_frame_n = 0\n\n'):
 
 		dup_exists = False
 
@@ -85,6 +86,7 @@ class Menu(object):
 				if file_ == name + '.tra':		
 
 					dup_exists = True
+					time.sleep(0.2)
 					action = options_run(['Overwrite', 'Cancel'], 0, [['d', 'to select']], 'There already exists a file with this name. Cancel or overwrite?')
 					
 					if action[0] == 0:
@@ -126,7 +128,7 @@ class Menu(object):
 					continue
 
 				copyfile = open(directory + files[action[0]], 'r')
-				create_file(name, directory, False, copyfile.read())
+				self.create_file(name, directory, False, copyfile.read())
 				copyfile.close()
 
 				os.remove(directory + files[action[0]])
@@ -136,17 +138,17 @@ class Menu(object):
 
 				return 0
 
-	def write_file(self, directory):
+	def export_file(self, directory):
 
 		files = listdir(directory)
 
-		if files != []: action = options_run(files, 0, [['d', 'to write'] , ['a', 'to exit']], 'Please select a file to write:')
+		if files != []: action = options_run(files, 0, [['d', 'to write'] , ['a', 'to exit']], 'Please select a file to export:')
 
 		if action[1] == 'd':
 
 			clear()
 
-			error = Writer.write_to_arduino(directory + files[action[0]])
+			error = export(directory + files[action[0]])
 
 			if error == 0:
 				pause = raw_input('Written successfully. Press enter to return to main menu...')
@@ -180,7 +182,7 @@ class Menu(object):
 			break
 
 		if files_there:
-			option_list = ['Open file', 'Create file', 'Write file', 'Delete file', 'Rename file']
+			option_list = ['Open file', 'Create file', 'Export file', 'Delete file', 'Rename file']
 		else:
 			option_list = ['Create file']
 
@@ -201,9 +203,9 @@ class Menu(object):
 				self.delete_file(self.CWD + '\Traces\\')
 				self.output = None
 
-			elif option_list[action[0]] == 'Write file':
+			elif option_list[action[0]] == 'Export file':
 
-				self.write_file(self.CWD + '\Traces\\')
+				self.export_file(self.CWD + '\Traces\\')
 				self.output = None
 
 			elif option_list[action[0]] == 'Open file':
@@ -224,3 +226,47 @@ class Menu(object):
 
 		elif action[1] == 'a':
 			self.output = 0
+
+
+
+CK_DIVS = 256
+
+def export(filepath):
+
+	with open(filepath, "r") as f:
+
+		points = [map(list, zip(*[map(lambda x: -1 if x == "~" else int(x), val.split(",")) for val in line.split("/")])) for line in f.read().split("\n")[1:-1]]
+
+	minpoint = [10000, 10000]
+	maxpoint = [0, 0]
+
+	for pointset in points:
+		for point in pointset:
+			if not -1 in point:
+				minpoint[0] = min(point[0], minpoint[0])
+				minpoint[1] = min(point[1], minpoint[1])
+				maxpoint[0] = max(point[0], maxpoint[0])
+				maxpoint[1] = max(point[1], maxpoint[1])
+
+	print points
+
+	margin = minpoint
+	bottomright = add_tuple(minpoint, maxpoint)
+
+	
+	print bottomright
+
+	scalex, scaley = CK_DIVS/float(bottomright[0]), CK_DIVS/float(bottomright[1])
+
+	print scalex, scaley
+
+	for line in range(len(points)):
+		for i in range(len(points[line])):
+			if not -1 in points[line][i]:
+
+				points[line][i][0] = int(points[line][i][0]*scalex)
+				points[line][i][1] = int(points[line][i][1]*scaley)
+
+
+	for line in points:
+		print line

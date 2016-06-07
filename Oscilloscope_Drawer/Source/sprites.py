@@ -30,7 +30,14 @@ class Sprite(object):
 		elif type(self.filepath) == pygame.Surface:
 			self.image = self.filepath
 
+		elif type(self.filepath) == list or type(self.filepath) == tuple:
+			self.image = pygame.Surface(self.filepath)
+			self.image.fill((193, 193, 193))
+			pygame.draw.rect(self.image, (68, 68, 68), ((0, 0), self.filepath), 1)
+			pygame.draw.rect(self.image, (153, 153, 153), ((1, 1), subtract_tuple(self.filepath, (2, 2))), 1)
+
 		if type(alpha) == int: self.image.set_alpha(alpha)
+
 		if 'scale' in kwargs: self.image = pygame.transform.scale(self.image, multiply_tuple(kwargs['scale'], self.image.get_rect().size, int=True))
 
 		self.rect = self.image.get_rect()
@@ -119,8 +126,10 @@ class Button(Sprite):
 
 				if self.type == 'follow':
 					self.active = True
-					if type(self) == Button: self.mouse_pos = subtract_tuple(mouse['pos'], self.pos)
-					elif type(self) == Slider: 
+					if type(self) == Button: 
+						self.mouse_pos = subtract_tuple(mouse['pos'], self.pos)
+
+					elif type(self) == Slider:
 						if self.orientation == 0: self.mouse_pos = subtract_tuple(mouse['pos'], (self.pos[0], self.pos[1]+self.displace))
 						else: self.mouse_pos = subtract_tuple(mouse['pos'], (self.pos[0]+self.displace, self.pos[1]))
 						
@@ -268,6 +277,7 @@ class MultiSprite(object):
 				sprite.check_active(mouse)
 			elif type(sprite) == Slider:
 				sprite.check_active(mouse)
+
 			if sprite.active:
 				self.active = True
 			if sprite.hover:
@@ -293,15 +303,24 @@ class Slider(Button):
 		self.id = False
 		self.z = kwargs['z'] if 'z' in kwargs else 5
 		self.type = kwargs['type'] if 'type' in kwargs else 'follow' 
+		self.image = Sprite((0, 0), kwargs['image']) if 'image' in kwargs else False
+		self.img_displace = kwargs['img_displace'] if 'img_displace' in kwargs else False
 
 		self.bar_rect = bar_rect
 		self.orientation = orientation
 		self.range = self.bar_rect.size[1-self.orientation]-4
 		self.pos = add_tuple((2, 2), self.bar_rect.topleft)
 
-		self.length = math.ceil(self.range/12.0)
+		if self.image:
+			self.image.load("convert_alpha")
+			self.length = self.image.image.get_rect().size[1-self.orientation]
+		else:
+			self.length = math.ceil(self.range/12.0)
+
 		self.displace = 11.0*self.range / 12.0
 		self.mouse_pos = (0, 0)
+
+		self.min, self.max = 0, self.range - self.length
 
 		self.update() 
 
@@ -312,20 +331,34 @@ class Slider(Button):
 	def update(self, **kwargs):
 
 		if 'displace' in kwargs: self.displace = kwargs['displace'] 
-		elif 'add_displace' in kwargs: self.displace += kwargs['add_displace'] 
+		elif 'add_displace' in kwargs: self.displace += kwargs['add_displace']
+
 		if 'length' in kwargs: 
 			length_dif = self.length - kwargs['length']
 			self.length = kwargs['length']
 			self.displace += length_dif/2.0
 		if 'add' in kwargs: self.displace += kwargs['add']
 		
-		if self.displace > self.range - self.length or 'max' in kwargs: self.displace = self.range - self.length
-		elif self.displace < 0: self.displace = 0
+
+		if 'set_max' in kwargs: self.max = kwargs['set_max'] * (self.range - self.length) / 100.0
 		
-		if self.length >= self.range:
-			self.percent = 0.0
+		if 'set_min' in kwargs: self.min = kwargs['set_min'] * (self.range - self.length) / 100.0
+
+		if 'max' in kwargs: self.displace = self.range - self.length
+		else: self.displace = min(self.displace, self.range - self.length, self.max) 
+
+		if 'min' in kwargs: self.displace = 0
+		else: self.displace = max(self.displace, 0, self.min)
+
+		
+		if 'percent' in kwargs:
+			self.percent = kwargs['percent']
+			self.displace = self.percent * (self.range - self.length) / 100.0
 		else:
-			self.percent = 100.0 * self.displace / (self.range - self.length)
+			if self.length >= self.range:
+				self.percent = 0.0
+			else:
+				self.percent = 100.0 * self.displace / (self.range - self.length)
 		
 		if self.orientation == 0:
 			self.rect = Rect((self.pos[0], self.pos[1] + self.displace), (self.bar_rect.width-4, self.length))
@@ -333,21 +366,31 @@ class Slider(Button):
 		else:
 			self.rect = Rect((self.pos[0] + self.displace, self.pos[1]), (self.length, self.bar_rect.height-4))
 
+
 	def load(self, **kwargs):
 		if 'id' in kwargs: self.id = kwargs['id']
 
-	def draw(self, display):
-		pygame.draw.rect(display, (225, 225, 225), self.rect)
-		pygame.draw.rect(display, (125, 125, 125), self.rect, 1)
-		if self.state == 1:
-			s = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-			s.fill((0, 0, 0, 100))
-			display.blit(s, self.rect)
 
-		elif self.state == 2:
-			s = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-			s.fill((0, 0, 0, 50))
-			display.blit(s, self.rect)
+	def draw(self, display):
+
+		if self.image:
+			if self.img_displace:
+				self.image.draw(display, pos=add_tuple(self.rect.topleft, self.img_displace))
+			else:
+				self.image.draw(display, pos=self.rect.topleft)
+		else:
+			pygame.draw.rect(display, (225, 225, 225), self.rect)
+			pygame.draw.rect(display, (125, 125, 125), self.rect, 1)
+			if self.state == 1:
+				s = pygame.Surface(self.rect.size, pygame.SRCALPHA)
+				s.fill((0, 0, 0, 100))
+				display.blit(s, self.rect)
+
+			elif self.state == 2:
+				s = pygame.Surface(self.rect.size, pygame.SRCALPHA)
+				s.fill((0, 0, 0, 50))
+				display.blit(s, self.rect)
+			
 
 class Scrollbar(MultiSprite):
 	
@@ -373,9 +416,9 @@ class Scrollbar(MultiSprite):
 		for sprite in self.sprites: 
 			sprite.pos = multiply_tuple(SCALE(), sprite.pos)
 			
-		self.sprites[0].load(scale=SCALE(), id='decrease') if self.orientation else self.sprites[0].load(scale=SCALE(), id='increase')
-		self.sprites[1].load(scale=SCALE())
-		self.sprites[2].load(scale=SCALE(), id='increase') if self.orientation else self.sprites[2].load(scale=SCALE(), id='decrease')
+		self.sprites[0].load(scale = SCALE(), id='decrease') if self.orientation else self.sprites[0].load(scale = SCALE(), id='increase')
+		self.sprites[1].load(scale = SCALE(), )
+		self.sprites[2].load(scale = SCALE(), id='increase') if self.orientation else self.sprites[2].load(scale = SCALE(), id='decrease')
 
 		self.sprites.append(Slider(self.sprites[1].rect, self.orientation, type='follow'))
 		self.sprites[-1].load(id='slider')
@@ -394,7 +437,7 @@ class Text(object):
  		self.length = kwargs['length'] if 'length' in kwargs else 0
  		self.background = kwargs['background'] if 'background' in kwargs else True
  		self.lifetime = kwargs['lifetime'] if 'lifetime' in kwargs else 50
- 		self.align_right = kwargs['align_right'] if 'align_right' in kwargs else False
+ 		self.align = kwargs['align'] if 'align' in kwargs else False
  		self.fit_rect = kwargs['fit_rect'] if 'fit_rect' in kwargs else False
 		self.only_show_in_bounding_rect = kwargs['only_show_in_bounding_rect'] if 'only_show_in_bounding_rect' in kwargs else False 
 
@@ -436,6 +479,7 @@ class Text(object):
 	 		self.fsurface = pygame.Surface(self.rect.size)
 		 	self.fsurface.fill((255, 255, 255))
 		 	pygame.draw.rect(self.fsurface, (130, 130, 130), self.rect, 1)
+		 	
 		else:
 			self.fsurface = pygame.Surface(self.rect.size, pygame.SRCALPHA)
 
@@ -458,21 +502,25 @@ class Text(object):
  		if self.only_show_in_bounding_rect and not bounding_rect.contains(self.rect):
  			return
 
- 		self.draw_pos = self.rect.topleft
+ 		self.draw_pos = list(self.rect.topleft)
 
-		if self.align_right:
- 			self.draw_pos = (self.draw_pos[0]-self.rect.width, self.draw_pos[1])
- 		
- 		elif self.draw_pos[1] + self.rect.height > bounding_rect.bottom:
- 			self.draw_pos = (self.draw_pos[0], bounding_rect.bottom-self.rect.height)
- 		
- 		if self.draw_pos[1] <= bounding_rect.top:
- 			self.draw_pos = (self.draw_pos[0], bounding_rect.top)
+ 		if self.align == "centre":
+ 			self.draw_pos[0] -= self.rect.width/2
 
- 		if self.draw_pos[0] + self.rect.width > bounding_rect.right + int(self.rect.height/3.0):
- 			self.draw_pos = (bounding_rect.right-self.rect.width + int(self.rect.height/3.0), self.draw_pos[1])
+ 		else:
+			if self.align == "right":
+	 			self.draw_pos = (self.draw_pos[0]-self.rect.width, self.draw_pos[1])
+	 		
+	 		elif self.draw_pos[1] + self.rect.height > bounding_rect.bottom:
+	 			self.draw_pos = (self.draw_pos[0], bounding_rect.bottom-self.rect.height)
+	 		
+	 		if self.draw_pos[1] <= bounding_rect.top:
+	 			self.draw_pos = (self.draw_pos[0], bounding_rect.top)
 
- 		elif self.draw_pos[0] <= bounding_rect.left:
- 			self.draw_pos = (bounding_rect.left, self.draw_pos[1])
+	 		if self.draw_pos[0] + self.rect.width > bounding_rect.right + int(self.rect.height/3.0):	
+	 			self.draw_pos = (bounding_rect.right - self.rect.width + int(self.rect.height/3.0), self.draw_pos[1])
+
+	 		elif self.draw_pos[0] <= bounding_rect.left:
+	 			self.draw_pos = (bounding_rect.left, self.draw_pos[1])
 
 		display.blit(self.fsurface, self.draw_pos)  

@@ -43,14 +43,12 @@ while True:
 	# Run program loop
 
 	quit = False
-	i = 0
-
+	
 	while not quit:
 
 		editor.update()
 		
 		editor.draw()
 
- 		i +=  1
 
  	pygame.display.update()

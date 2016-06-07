@@ -1,11 +1,8 @@
-tools window pos = (846, 906)
+tools window pos = (56, 156)
 window size = 2.0x
-grid type = Dotted
+grid type = Lined
 Tool buttons:
-blank5 = [Rmouse,alt],[Lmouse,alt]
 make selection = [Lmouse,ctrl]
-blank9 = [Rmouse,shift]
 add point = [Lmouse]
 delete point = [Rmouse]
-toggle line = [Rmouse]
 move point = [Lmouse]

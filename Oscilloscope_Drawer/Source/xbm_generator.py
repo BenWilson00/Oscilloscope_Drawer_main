@@ -2,7 +2,7 @@ import pygame
 from basic import *
 
 cursors = {
-'arrow' : (               #24x24
+'arrow' : (False, [          #24x24
 	'#                       ',
 	'##                      ',
 	'#.#                     ',
@@ -26,9 +26,9 @@ cursors = {
 	'                        ',
 	'                        ',
 	'                        ',
-	'                        '),
+	'                        ']),
 
-'click' : (               #24x24
+'click' : ("#", [            #24x24
 	'     @#                 ',
 	'    #..#                ',
 	'    #..#                ',
@@ -52,9 +52,9 @@ cursors = {
 	'     #........#         ',
 	'     ##########         ',
 	'                        ',
-	'                        '),
+	'                        ']),
 
-'grab' : (               #24x24
+'grab' : ("#", [             #24x24
 	'        @#              ',
 	'     ###..###           ',
 	'    #..#..#..##         ',
@@ -78,9 +78,9 @@ cursors = {
 	'                        ',
 	'                        ',
 	'                        ',
-	'                        '),
+	'                        ']),
 
-'cardinal' : (         #24x24
+'cardinal' : ("#", [         #24x24
 	'           ..           ',
 	'          .##.          ',
 	'         .####.         ',
@@ -104,9 +104,9 @@ cursors = {
 	'          .##.          ',
 	'        ...##...        ',
 	'          .##.          ',
-	'           ..           '),#24
+	'           ..           ']),#24
 
-'horizontal' : (         #24x24
+'horizontal' : (" ", [       #24x24
 	'         ..  ..         ',
 	'        .#.  .#.        ',
 	'       .##.  .##.       ',
@@ -130,9 +130,9 @@ cursors = {
 	'       .##.  .##.       ',
 	'       .##.  .##.       ',
 	'        .#.  .#.        ',
-	'         ..  ..         '),#24
+	'         ..  ..         ']),#24
 
-'vertical' : (           #24x24
+'vertical' : (" ", [         #24x24
 	'           ..           ',
 	'          .##.          ',
 	'         .####.         ',
@@ -156,9 +156,9 @@ cursors = {
 	'        ...##...        ',
 	'         .####.         ',
 	'          .##.          ',
-	'           ..           '),#24
+	'           ..           ']),#24
 
-'diag1' : (              #24x24
+'diag1' : (" ", [            #24x24
 	'   .....          ......',
 	'.   .###.          .###.',
 	'..   .###.         .###.',
@@ -182,9 +182,9 @@ cursors = {
 	'.####.         .###.   .',
 	'.###.           .###.   ',
 	'.###.            .###.  ',
-	'......            ..... '),#24
+	'......            ..... ']),#24
 
-'diag2' : (              #24x24
+'diag2' : (" ", [            #24x24
 	'......          .....   ',
 	'.###.          .###.   .',
 	'.###.         .###.   ..',
@@ -208,7 +208,7 @@ cursors = {
 	'.   .###.         .####.',
 	'   .###.           .###.',
 	'  .###.            .###.',
-	' .....            ......')#24
+	' .....            ......'])#24
 }
 
 
@@ -257,11 +257,27 @@ def generate_single(cursor, scale):
 
 	filename = CWD() + '\Cursors\\' + cursor
 
+
+	# get cursor position
+	replace = cursors[cursor][0]
+
+	if replace:
+		for line in range(0, len(cursors[cursor][1])):
+			pos = cursors[cursor][1][line].find("@")
+			if pos != -1:
+				cursor_offset = (pos * scale, line * scale)
+				offset_string = ":" + str(cursor_offset) + ",\n"
+				cursors[cursor][1][line] = cursors[cursor][1][line].replace("@", replace)
+
+	else:
+		offset_string = ":(0, 0),\n"
+
+	# retrieve bitmap from string
 	xbm  = '#define cursor_width ' + str(int(24*scale)) + '\n'
 	xbm += '#define cursor_height ' + str(int(24*scale)) + '\n'
 	xbm += 'static char cursor_bits[] = {\n'
 
-	for line in cursors[cursor]: 
+	for line in cursors[cursor][1]: 
 		xbm += get_line_hex(line, ['#'], scale)
 
 	xbm += '};'
@@ -274,7 +290,7 @@ def generate_single(cursor, scale):
 	xbm_mask += '#define cursor_height ' + str(int(24*scale)) + '\n'
 	xbm_mask += 'static char cursor_bits[] = {\n'
 
-	for line in cursors[cursor]: 
+	for line in cursors[cursor][1]: 
 		xbm_mask += get_line_hex(line, ['#', '.'], scale)
 
 	xbm_mask += '};'
@@ -283,13 +299,7 @@ def generate_single(cursor, scale):
 	xbm_file.write(xbm_mask)
 	xbm_file.close()
 
-	for line in range(0, len(cursors[cursor])):
-		pos = cursors[cursor][line].find("@")
-		if pos != -1:
-			cursor_offset = (pos * scale, line * scale)
-			return cursor + ":" + str(cursor_offset) + ",\n"
-
-	return cursor + ":(0, 0),\n"
+	return cursor + offset_string
 
 def generate():
 

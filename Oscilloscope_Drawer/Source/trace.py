@@ -126,7 +126,9 @@ class Trace(object):
 		return self.get_cf().get_points()
 
 	def save_file(self, filepath, name):
+
 		to_write = 'curr_frame_n = ' + str(self.curr_frame_n) + '\n'
+
 		for frame in self.frames:
 			if len(frame.points) > 0:
 				x_points, y_points = zip(*frame.points)
@@ -141,4 +143,7 @@ class Trace(object):
 		trace_file.close()
 		print 'Written successfully to', name
 
-		time.sleep(0.5)
+		time.sleep(0.2)
+
+
+		

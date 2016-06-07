@@ -1,9 +1,11 @@
 import pygame
 import xbm_generator
+import selection
 from pygame.locals import *
 from sprites import *
 from basic import *
 from tools_window import *
+from add_image import *
 
 
 
@@ -15,7 +17,11 @@ from tools_window import *
 
 
 ###############
-# Undo & Redo
+# Fix undo crashes
+#
+# Cancel selection on line toggle, point move/add, zoom/scroll change
+#
+# Right click on tools window to hide all but top
 ###############
 
 
@@ -82,9 +88,10 @@ class Editor(object):
 		self.action = 'None'
 		self.action_time = 0
 		self.follow_mouse = [False]
-		self.input_req = {"Action" : False,
-											"Allowlist" : [],
-											"NoDrawlist" : []}
+		
+		self.reset_input_req()
+
+		self.imagehdl = False
 
 		self.selected = False
 		self.selecting = False
@@ -98,6 +105,13 @@ class Editor(object):
 		self.draw_list = []
 
 		self.starttime = time.clock()
+		self.i = 0
+
+	def reset_input_req(self):
+
+		self.input_req = {"Action" : False,
+											"Allowlist" : [],
+											"NoDrawlist" : []}
 
 	def handle_framerate(self):
 
@@ -106,12 +120,13 @@ class Editor(object):
 		
 		time_dif_2 = time.clock()-self.starttime
 		framerate =  int(round(1/time_dif_2))
-		self.texts['framerate'] = Text(self.large_font, str(framerate), (self.width, 53*SCALE()), background=None, align_right=True)
+		self.texts['framerate'] = Text(self.large_font, str(framerate), (self.width, 53*SCALE()), background=None, align="right")
 		
 		self.starttime = time.clock()
 
 	def update(self):
 
+		# if not self.i % 5: clear()
 		clear()
 
 		self.handle_framerate()
@@ -129,11 +144,15 @@ class Editor(object):
 
 		self.enforce_action()
 
+		self.i += 1
+
 	def get_elements(self):
 
 		self.elements = [self.tools_window, self.trace] + self.buttons.values() + self.scrollbars.values() + self.texts.values()
 		
 		if self.selecting or self.selected: self.elements.append(self.selection)
+
+		if self.imagehdl: self.elements.append(self.imagehdl)
 
 		self.elements.sort(key=lambda x: x.z)
 
@@ -226,6 +245,7 @@ class Editor(object):
 
 
 	def enforce_action(self):
+
 		cf = self.trace.get_cf()
 
 		# scrollbar management
@@ -297,6 +317,9 @@ class Editor(object):
 			
 
 			if self.action[-2] == 'move point':
+				if not self.follow_mouse[0]: 
+					cf.record_change()
+
 				self.follow_mouse = ("trace point", self.action[-1], 'until click stops')
 				cf.move_point(self.mouse)
 
@@ -310,28 +333,40 @@ class Editor(object):
 
 
 			elif self.action[-1] == 'delete point':
+				cf.record_change()
+
 				cf.delete_point('active')
 
 
 			elif self.action[-1] == 'add point':
+				cf.record_change()
+
 				cf.add_point(cf.min_distance['next_point'], cf.min_distance['pos'], True)
 
 
 			elif self.action[-1] == 'toggle line':
+				cf.record_change()
+				
 				cf.toggle_line(cf.min_distance['next_point'])
 
 
 			elif self.action[-1] == 'make selection':
+				#if not self.follow_mouse[0]: cf.record_change()
+
 				cf.make_selection(self.mouse)
 				self.follow_mouse = self.action
 
 
 			elif self.action[-1] == 'mutate selection':
+				# switch tools if not actually mutating
+
 				if any(len(i) > 0 for i in self.tool_buttons['mutate selection']):
 					self.tools_window.update_tool_buttons(self.tool_buttons['mutate selection'][0][0], 'make selection', self.tool_buttons['mutate selection'][0][1] if len(self.tool_buttons['mutate selection'][0]) > 1 else 'None')
 
 
 			elif self.action[-3] == 'selection':
+				if not self.follow_mouse[0] and (self.mouse["Lactive"] or self.mouse["Ractive"]): 
+					cf.record_change()
 
 				cf.update_selection(self.action[-1], point=self.action[-2], mouse=self.mouse)
 				self.follow_mouse = self.action + ('until click stops',)
@@ -339,7 +374,8 @@ class Editor(object):
 
 			elif self.action[-1] == "end paste":
 
-				cf.add_point(cf.min_distance['next_point'], [self.copy_selection.points_in_rect[key] for key in sorted(self.copy_selection.points_in_rect)])
+				cf.add_point(cf.min_distance['next_point'], [self.copy_selection.points_in_rect[key] for key in sorted(self.copy_selection.points_in_rect)], 
+																		 split_points = [self.copy_selection.split_points[key] if key in self.copy_selection.split_points else False for key in sorted(self.copy_selection.points_in_rect)])
 
 				cf.selection = self.copy_selection.copy()
 
@@ -351,9 +387,8 @@ class Editor(object):
 					cf.selection.points_in_rect[cf.min_distance['next_point'] + i] = self.copy_selection.points_in_rect[key]
 					i += 1
 
-				self.input_req = {"Action" : False,
-													"Allowlist" : [],
-													"NoDrawlist" : []}
+				self.reset_input_req()
+													
 				cf.active = False
 				cf.action = False
 				self.trace.update(input_req = False)
@@ -407,11 +442,41 @@ class Editor(object):
 				self.trace.frame_selector.update(displace=self.scrollbars['frame scrollbar'].sprites[-1].percent/100)
 
 
+
+
+
+		if self.action[0] == "image handler":
+
+			if self.action[1] == "generate image point data":
+				cf.record_change()
+
+				points, splits, size = self.imagehdl.image_data
+
+				if size[1] > self.trace_rect.height:
+					scale = self.trace_rect.height/float(size[1])
+
+					for i in range(len(size)):
+						size[i] = int(size[i]*scale)
+
+					for point in points:
+						points[point] = list(points[point])
+						for i in range(len(points[point])):
+							points[point][i] = int(points[point][i]*scale)
+
+				self.copy_selection = selection.Selection(self.trace_rect.topleft, self.trace_rect, CWD() + '\Images\Selection\\', 
+																									copy=(Rect(self.trace_rect.topleft, size), False, points, splits, 'selection'))
+
+				self.action = ("paste", "click")
+				self.reset_input_req()
+
+				self.imagehdl = False
+
+
+
 		# manage tools window
 
 
 		elif self.action[0] == 'tools window':
-
 
 			if self.action[1] == 'move':
 				self.follow_mouse = ('tools window', 'until click stops')
@@ -422,10 +487,20 @@ class Editor(object):
 				self.follow_mouse = ('tools window', 'slider', 'until click stops')
 
 
+		# manage photo insert menu
+
+
+		elif self.action[0] == "image handler":
+
+			self.follow_mouse = ("image handler", self.action[-1])
+
+
 		# manage toolbar buttons
 
 
 		if self.action[0] == 'deselect' and cf.selection:
+			cf.record_change()
+
 			cf.selection = False
 			if any(len(i) > 0 for i in self.tool_buttons['mutate selection']):
 				self.tools_window.update_tool_buttons(self.tool_buttons['mutate selection'][0][0], 'make selection', self.tool_buttons['mutate selection'][0][1] if len(self.tool_buttons['mutate selection'][0]) > 1 else 'None')
@@ -433,6 +508,7 @@ class Editor(object):
 
 
 		elif self.action[0] == 'grid':
+
 			self.buttons['grid'].cycle()
 
 			self.settings['grid type'] = self.grid_types[self.buttons['grid'].curr_image]
@@ -449,15 +525,23 @@ class Editor(object):
 
 
 
+
 		elif self.action[0] == 'cut':
+			cf.record_change()
+
 			self.copy_selection = cf.update_selection("cut", mouse=self.mouse)
 
 
+
 		elif self.action[0] == 'copy':
-			self.copy_selection = cf.selection.copy()
+			if cf.selection:
+				self.copy_selection = cf.selection.copy()
+
 
 
 		elif self.action[0] == 'paste':
+			cf.record_change()
+
 			if self.copy_selection:
 				if cf.selection:
 					cf.selection = False
@@ -467,6 +551,33 @@ class Editor(object):
 													"NoDrawlist" : ["tools window"]}
 
 				self.texts["action required text"] = Text(self.med_font, "Please select a line to paste onto", (3*SCALE(), 53*SCALE()), lifetime = None)
+
+
+
+		elif self.action[0] == 'undo':
+			cf.restore_change()
+
+
+
+		elif self.action[0] == 'redo':
+			cf.restore_change(1)
+
+
+
+		elif self.action[0] == 'insert image':
+
+			if not self.imagehdl:
+				self.input_req = {"Action" : "insert image",
+													"Allowlist" : ["image handler", "action required text"],
+													"NoDrawlist" : ["tools window"]}
+
+				# self.texts["action required text"] = Text(self.med_font, "Follow the instructions given by the ", (3*SCALE(), 53*SCALE()), lifetime = None)
+			
+				self.imagehdl = ImageHandler(CWD() + "\Insert Images\\", self.height, self.width, [self.small_font, self.med_font])
+
+				if not self.imagehdl.success:
+					self.imagehdl = False
+					self.reset_input_req()
 
 
 		elif self.action[0] == 'help':
@@ -480,6 +591,23 @@ class Editor(object):
 					else: self.texts[button] = Text(self.small_font, button, add_tuple(self.tools_window.rect.topleft, self.tools_window.tools[button].rect.topleft), z=11, fit_rect=self.tools_window.rect, only_show_in_bounding_rect=True)
 
 
+
+
+		elif self.action[0] == 'export':
+
+			self.trace.save_file(CWD() + '\Traces\\' + self.name, self.name)
+			menu.export(self.name)
+			
+			error = export(directory + files[action[0]])
+
+			if error == 0:
+				pause = raw_input('Written successfully. Press enter to return to main menu...')
+				return 0
+			else:
+				pause = raw_input('Writing error: ' + str(error) + '. Press enter to return to main menu...')
+				return 1
+			
+			time.sleep(0.2)
 
 		
 		point_pos_update = False
@@ -738,6 +866,10 @@ class Editor(object):
 										'cut' : Button((136*SCALE(), 4*SCALE()), directory + 'cut_button.png'),
 										'copy' : Button((180*SCALE(), 4*SCALE()), directory + 'copy_button.png'),
 										'paste' : Button((224*SCALE(), 4*SCALE()), directory + 'paste_button.png'),
+										'undo' : Button((268*SCALE(), 4*SCALE()), directory + 'undo_button.png'),
+										'redo' : Button((312*SCALE(), 4*SCALE()), directory + 'redo_button.png'),
+										'insert image' : Button((356*SCALE(), 4*SCALE()), directory + 'insert_image_button.png'),
+										'export' : Button((766*SCALE(), 4*SCALE()), directory + 'export_button.png'),
 										'help' : Button((810*SCALE(), 4*SCALE()), directory + 'help_button.png'),
 										'show point pos' : Button((854*SCALE(), 4*SCALE()), directory + 'show_point_pos_button.png') }
 		

@@ -2,3 +2,13 @@
 mouse scrolling
 selection tool - done 'cut', now 'paste' with points
 look into PWM - arcs
+
+         R
+PWM OUT ----/\/\/\-----+------------ OUTPUT
+           |
+          === C
+                       |
+                      GND
+
+R = 10k
+C = 0.1uF   

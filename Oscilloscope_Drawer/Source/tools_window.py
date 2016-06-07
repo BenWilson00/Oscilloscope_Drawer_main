@@ -32,6 +32,8 @@ class Tools_Window(object):
 																		  ['move point', 'toggle line'],
 																		  ['move point', 'select']]
 
+		self.disallowed_tool_combinations = [['add point', 'toggle line']]
+
 		self.forced_tool_combinations = {'add point' : ['move point']}
 
 		for combination in self.allowed_tool_combinations:
@@ -127,7 +129,7 @@ class Tools_Window(object):
 
 			if self.tools[tool].Lactive:
 				self.update_tool_buttons('Lmouse', tool)
-			if self.tools[tool].Ractive:
+			elif self.tools[tool].Ractive:
 				self.update_tool_buttons('Rmouse', tool)
 
 			if self.tools[tool].hover:
@@ -161,24 +163,87 @@ class Tools_Window(object):
 		return (self.id, 'mouse over')
 
 	def check_multiple_tools_allowed(self, *tools):
-
 		if sorted(list(tools)) in self.allowed_tool_combinations: return True
 		return False
 
 	def update_tool_buttons(self, mouse, tool, mod = False):
 
+		print tool
+		print "\ntools:"
+		for tool1 in self.tool_buttons:
+			if self.tool_buttons[tool1] != []:
+				print tool1, self.tool_buttons[tool1]
+
+		print "\n"
+
 		if not mod: mod = self.mod_key
 		combination = [mouse, mod] if mod != 'None' else [mouse]
 
+		test = False
+		for toolset in self.disallowed_tool_combinations:
+			if tool in toolset:
+				test = list(toolset)
+				test.remove(tool)
+				break
+
+		if test:
+			for tool1 in test:
+
+				rem_mouses = ()
+				if mod == "None":
+					for i in self.tool_buttons[tool1]:
+						if len(i) == 1:
+							rem_mouses += (i[0],)
+				else:
+					for i in self.tool_buttons[tool1]:
+						if len(i) > 1:
+							if i[1] == mod:
+								rem_mouses += (i[0],)
+
+				if len(rem_mouses) > 0:
+					print "disallowed combination detected"
+
+					for i in self.tool_buttons[tool1]:
+						if i[0] in rem_mouses:
+							print "remove", tool1, self.tool_buttons[tool1], "\n"
+							self.tool_buttons[tool1].remove(i)
+							self.tools[tool1].load(scale=SCALE(), name=tool1)
+				
 		for tool2 in self.tool_buttons:
 			if combination in self.tool_buttons[tool2] and not self.check_multiple_tools_allowed(tool, tool2):
+				print "remove", tool2, combination
 				self.tool_buttons[tool2].remove(combination)
 				self.tools[tool2].load(scale=SCALE(), name=tool2) 
 
+		new_toolset = (tool,)
+
+		print "insert", mouse, tool, combination
 		self.insert_tool(mouse, tool, combination)
+
 		if tool in self.forced_tool_combinations:
 			for tool2 in self.forced_tool_combinations[tool]:
-				self.insert_tool(mouse, tool2, combination)
+				if not (combination in self.tool_buttons[tool2]):
+
+					new_toolset += (tool2,)
+
+					print "insert", mouse, tool2, combination
+					self.insert_tool(mouse, tool2, combination)
+
+
+		for tool1 in self.tool_buttons:
+			for tool2 in new_toolset:
+				if tool != tool2 and tool1 != tool2:
+					if combination in self.tool_buttons[tool1] and not self.check_multiple_tools_allowed(tool1, tool2):
+						print "remove", tool2, combination
+						self.tool_buttons[tool2].remove(combination)
+						self.tools[tool2].load(scale=SCALE(), name=tool2) 
+
+		print "\ntools:"
+		for tool1 in self.tool_buttons:
+			if self.tool_buttons[tool1] != []:
+				print tool1, self.tool_buttons[tool1]
+
+		#pause()
 
 	def insert_tool(self, mouse, tool, combination):
 

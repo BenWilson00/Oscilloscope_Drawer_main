@@ -26,12 +26,11 @@ class Selection(object):
 			self.start_selecting = True
 
 			self.points_in_rect = False
+			self.split_points = False
 
 		else:
 
-			rect_dimensions, self.selecting, self.points_in_rect, self.id = kwargs['copy']
-
-			self.rect = Rect(self.bounding_rect.topleft, rect_dimensions)
+			self.rect, self.selecting, self.points_in_rect, self.split_points, self.id = kwargs['copy']
 
 			self.start_selecting = False
 
@@ -45,8 +44,16 @@ class Selection(object):
 
 		self.align_points()
 
-	def copy(self):
-		return Selection(self.rect.topleft, self.bounding_rect, self.filepath, copy=(self.rect.size, self.selecting, self.points_in_rect, self.id))
+	def copy(self, topleft = "bounding rect"):
+
+		if topleft == "bounding rect":
+			return Selection(self.rect.topleft, self.bounding_rect, self.filepath, copy=(Rect(self.bounding_rect.topleft, self.rect.size), self.selecting, self.points_in_rect, self.split_points, self.id))
+		elif topleft == "current":
+			return Selection(self.rect.topleft, self.bounding_rect, self.filepath, copy=(self.rect.copy(), self.selecting, self.points_in_rect, self.split_points, self.id))
+		elif type(topleft) != str:
+			return Selection(self.rect.topleft, self.bounding_rect, self.filepath, copy=(Rect(topleft, self.rect.size), self.selecting, self.points_in_rect, self.split_points, self.id))
+		else:
+			print topleft
 
 	def align_points(self):
 
@@ -79,6 +86,9 @@ class Selection(object):
 
 			else:
 				self.points_in_rect = kwargs['points_in_rect']
+
+		if 'split_points' in kwargs:
+			self.split_points = kwargs['split_points']
 	
 	def check_active(self, mouse):
 

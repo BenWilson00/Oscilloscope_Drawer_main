@@ -1,5 +1,6 @@
 import csv
 import pygame
+import collections
 from basic import *
 from sprites import *
 from selection import *
@@ -46,11 +47,14 @@ class Frame(object):
 		self.mouse_pos = False
 			
 		self.change = False
+		self.prev_changes = collections.deque()
+		self.undo_dist = 0
+
 		self.change_pos = [0, 0, 0]
 		
 		self.min_distance = {'dist' : 20/self.zoom,
-					 		 'next_point' : None,
-							 'pos' : None}
+										 		 'next_point' : None,
+												 'pos' : None}
 		self.load_points()
 
 #last_point = reduce(lambda x, y: max(x, y) if y < pos and x < pos else x, self.split_points)
@@ -74,38 +78,50 @@ class Frame(object):
 
 	def toggle_line(self, point):
 
-		if point not in self.split_points:
-			if not ((point-1)%len(self.points) in self.split_points or (point+1)%len(self.points) in self.split_points):
-				self.split_points[point] = '-'
-			elif (point+1)%len(self.points) in self.split_points:
-				self.split_points[point+1] = '~'
-		elif self.split_points[point] == '-':
-			if len(self.split_points) > 1:
-				self.split_points[point] = '~'
-			else:
+		if len(self.points) > 0:
+			if point not in self.split_points:
+
+				if len(self.split_points) == 0:
+					self.split_points[point] = '-'
+				elif not ((point-1)%len(self.points) in self.split_points or (point+1)%len(self.points) in self.split_points):
+					self.split_points[point] = '-'
+
+				elif (point+1)%len(self.points) in self.split_points:
+					self.split_points[point+1] = '~'
+
+			elif self.split_points[point] == '-':
+
+				if len(self.split_points) > 1:
+					self.split_points[point] = '~'
+
+				else:
+					self.split_points.pop(point)
+
+			elif self.split_points[point] == '~':
 				self.split_points.pop(point)
-		elif self.split_points[point] == '~':
-			self.split_points.pop(point)
 
-		if len(self.split_points) == 1:
-			for point in self.split_points:
-				self.split_points[point] = '-'
+			if len(self.split_points) == 1:
+				for point in self.split_points:
+					self.split_points[point] = '-'
 
-		self.change = True
-		self.active = False
-		self.action = False
+			self.active = False
+			self.action = False
 
 
-	def add_point(self, start_pos, point_lst, set_active = False):
+	def add_point(self, start_pos, point_lst, set_active = False, **kwargs):
+
+
+		if "split_points" in kwargs:
+			get_split_points = True
+			new_splits = kwargs["split_points"]
+		else:
+			get_split_points = False
 
 		if type(point_lst[0]) != list and type(point_lst[0]) != tuple:
 			point_lst = [point_lst]
 
-		for i in range(0, len(point_lst)):
-			self.points.insert(start_pos + i, point_lst[i])
+		# adjust original split point positions
 
-
-		# adjust split point positions
 		to_update = []
 		
 		for split in self.split_points:
@@ -117,6 +133,15 @@ class Frame(object):
 		if start_pos in self.split_points:
 			if self.split_points[start_pos] == '-':
 				self.split_points[start_pos + len(point_lst)] = self.split_points.pop(start_pos)
+
+
+		# add points and new split points
+		for i in range(0, len(point_lst)):
+			self.points.insert(start_pos + i, point_lst[i])
+
+			if get_split_points:
+				if new_splits[i]:
+					self.split_points[start_pos + i] = new_splits[i]
 
 
 		if set_active:
@@ -132,29 +157,59 @@ class Frame(object):
 		for point in points:
 
 			if point == 'active':
-				for point in range(0, len(self.points)):
-					if self.states[point] == 1:
-						del self.points[point]
-						point = False
+				found = False
+				for i in range(0, len(self.points)):
+					if self.states[i] == 1:
+						found = True
+						point = i
+						del self.points[i]
 						break
+				if not found:
+					continue
+
 			else:
 				del self.points[point]
 
 			to_update = []
+			to_del = False
+
+			for split in self.split_points:
+				if split == point + 1:
+					to_del = split
+
+			if to_del != False:
+				del self.split_points[to_del]
+
 			for split in self.split_points:
 				if split > point:
 					to_update.append(split)
+					continue
+
 			for split in to_update:
 				self.split_points[split - 1] = self.split_points.pop(split)
+
+			if len(self.points) in self.split_points:
+				self.split_points[0] = self.split_points.pop(len(self.points))
+
+			del_dict = {}
+
+			for split in self.split_points:
+				for split2 in self.split_points:
+					if split == split2 + 1:
+						del_dict[split] = True
+
+			for split in del_dict:
+				del self.split_points[split]
 
 			self.active_point = False
 			self.active = False
 			self.action = False
 
-			if point:
-				for other_point in range(0, len(points)):
+			for other_point in range(0, len(points)):
+				if points[other_point] != "active":
 					if int(points[other_point]) > int(point):
 						points[other_point] -= 1
+
 
 		self.load_points()
 
@@ -165,7 +220,6 @@ class Frame(object):
 		if 'active' in kwargs:
 			self.states[kwargs['active']] = 2
 			self.active_point = str(kwargs['active'])
-		self.change = True
 
 	def set_points(self, change_dict):
 		for point in change_dict:
@@ -174,18 +228,32 @@ class Frame(object):
  	def get_points(self, **kwargs):
 
  		bound_rect = self.global_to_rel(kwargs["rect"]) if "rect" in kwargs else False
+ 		get_split_points = kwargs["split_points"] if "split_points" in kwargs else False
 
 		return_points = {}
+		if get_split_points: split_points = {}
 
 		if bound_rect:
 			for point in range(0, len(self.points)):
 				if bound_rect.collidepoint(self.points[point]):
 					return_points[point] = subtract_tuple(self.points[point], bound_rect.topleft)
+
+			if get_split_points:
+				for i in self.split_points:
+					if (bound_rect.collidepoint(self.points[i]) and bound_rect.collidepoint(self.points[i-1])):
+						split_points[i] = self.split_points[i]
+
 		else:
 			for point in range(0, len(self.points)):
 				return_points[point] = [self.points[point], self.rel_to_zoomed(self.points[point], scale=True)]
-		
-		return return_points
+			
+			if get_split_points:
+				split_points = self.split_points
+
+		if get_split_points:
+			return return_points, split_points
+		else:
+			return return_points
 	
 	def get_hover(self):
 		
@@ -201,7 +269,6 @@ class Frame(object):
 			if self.selection.active: return (self.id, self.frame_num,) + self.selection.get_action()
 
 	def check_active(self, mouse):
-
 
 		mouse_rel = Point(self.global_to_rel(mouse['pos']))
 
@@ -223,7 +290,10 @@ class Frame(object):
 			if self.selection:
 
 				if not self.selection.selecting and not (mouse['Lactive'] or mouse['Ractive']):
-					self.selection.update(points_in_rect = self.get_points(rect = self.selection.rect))
+					points_in_rect, split_points = self.get_points(rect = self.selection.rect, split_points=True)
+
+
+					self.selection.update(points_in_rect = points_in_rect, split_points=split_points)
 
 				self.selection.check_active(mouse)
 
@@ -421,6 +491,8 @@ class Frame(object):
 
 				if (d01.x >= x_acceptable or -x_acceptable >= d01.x) and d01.y != 0:
 
+					if d01.x == 0: d01.x = 0.00001
+
 					line_m = d01.y/d01.x
 					line_c = p1.y + d01.y - line_m * (p1.x + d01.x)
 
@@ -487,7 +559,6 @@ class Frame(object):
 				self.change_pos[0] = 1
 
 			self.points[int(self.active_point)] = mouse_rel
-			self.change = True
 
 	def draw_arrow_line(self, colour, p0, p1, **kwargs):
 
@@ -601,7 +672,8 @@ class Frame(object):
 		if self.selection:
 			if self.selection.points_in_rect:
 				for point in self.selection.points_in_rect:
-					self.states[point] = 3
+					if point in range(len(self.states)):
+						self.states[point] = 3
 		
 		self.surface.fill((0, 0, 0))
 
@@ -667,6 +739,9 @@ class Frame(object):
 
 		if update_type == "cut":
 
+			for key in self.selection.split_points:
+				if key in self.split_points:
+					del self.split_points[key]
 			self.delete_point(self.selection.points_in_rect.keys())
 
 			new = self.selection.copy()
@@ -717,9 +792,46 @@ class Frame(object):
 		elif tool == 'mutate selection' and mouse_active:
 			return True
 
-		# 
-		# 	if mouse_active:
-		# 		self.action ='select'
-		# 	elif self.action == 'select': 
-		# 		self.action = 'None'
-		# 		self.selecting = False
+
+			
+
+	def record_change(self, reset_list = True):
+
+		new_selection = self.selection.copy("current") if self.selection else False
+
+		self.prev_changes.append({"points" : list(self.points),
+															"split points" : dict(self.split_points),
+															"selection" : new_selection})
+
+		while len(self.prev_changes) > 100:
+			self.prev_changes.popleft()
+
+		if reset_list:
+
+			if self.undo_dist != 0:
+				for i in range(self.undo_dist, 0):
+					self.prev_changes.pop()
+				self.undo_dist = 0
+
+		self.change = True
+
+	def restore_change(self, displace = -1):
+
+		n = self.undo_dist + displace
+
+		if 0 < - n <= len(self.prev_changes): 
+
+			if n == -1 and displace < 0: 
+				self.record_change(False)
+				n -= 1
+
+			last_state = self.prev_changes[n]
+
+			self.points = list(last_state["points"])
+			self.split_points = dict(last_state["split points"])
+			self.selection = last_state["selection"].copy("current") if last_state["selection"] else False
+
+			self.undo_dist = n
+			self.change = True
+
+			self.load_points()

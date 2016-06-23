@@ -727,26 +727,38 @@ class Frame(object):
 
 	def update_selection(self, update_type, **kwargs):
 
-		if update_type == "change selection":
-			self.selection.mutate(kwargs["point"], kwargs["mouse"], {})
+		if self.selection:
 
-		if update_type == "mutate":
+			if update_type == "change selection":
 
-			new_points_in_rect = self.selection.mutate(kwargs["point"], kwargs["mouse"])
+				self.selection.mutate(kwargs["point"], kwargs["mouse"])
 
-			self.set_points( { key : map(int, add_tuple(new_points_in_rect[key], self.global_to_rel(self.selection.rect.topleft))) for key in new_points_in_rect})
+			if update_type == "mutate":
+
+				new_points_in_rect = self.selection.mutate(kwargs["point"], kwargs["mouse"])
+
+				self.set_points( { key : map(int, add_tuple(new_points_in_rect[key], self.global_to_rel(self.selection.rect.topleft))) for key in new_points_in_rect})
 
 
-		if update_type == "cut":
+			if update_type == "stop select":
 
-			for key in self.selection.split_points:
-				if key in self.split_points:
-					del self.split_points[key]
-			self.delete_point(self.selection.points_in_rect.keys())
+				self.selection.selecting = True
+				self.selection.points_in_rect = False
+				self.selection.split_points = False
+				self.selecting = True
 
-			new = self.selection.copy()
-			self.selection = False
-			return new
+
+			if update_type == "cut":
+
+				for key in self.selection.split_points:
+					if key in self.split_points:
+						del self.split_points[key]
+
+				self.delete_point(self.selection.points_in_rect.keys())
+
+				new = self.selection.copy()
+				self.selection = False
+				return new
 
 
 	def recalc_selection_rect(self):

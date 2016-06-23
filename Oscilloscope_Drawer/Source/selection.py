@@ -113,6 +113,7 @@ class Selection(object):
 					return (self.id, point, 'mutate')
 
 	def set_start_size(self, mouse_pos):
+		
 		mouse = list(mouse_pos)
 		if mouse[0] > self.pos[0]:
 			mouse[0] = min(self.bounding_rect.right, mouse[0])

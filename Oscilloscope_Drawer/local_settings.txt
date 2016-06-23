@@ -1,8 +1,9 @@
-tools window pos = (56, 156)
+tools window pos = (1404, 251)
 window size = 2.0x
-grid type = Lined
+grid type = None
 Tool buttons:
 make selection = [Lmouse,ctrl]
 add point = [Lmouse]
 delete point = [Rmouse]
+toggle line = [Rmouse,ctrl]
 move point = [Lmouse]

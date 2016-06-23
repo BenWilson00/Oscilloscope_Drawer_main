@@ -148,14 +148,13 @@ class Menu(object):
 
 			clear()
 
-			error = export(directory + files[action[0]])
+			export(directory + files[action[0]])
 
-			if error == 0:
-				pause = raw_input('Written successfully. Press enter to return to main menu...')
-				return 0
-			else:
-				pause = raw_input('Writing error: ' + str(error) + '. Press enter to return to main menu...')
-				return 1
+			pause = raw_input('Written successfully. Press enter to return to main menu...')
+
+			# else:
+			# 	pause = raw_input('Writing error: ' + str(error) + '. Press enter to return to main menu...')
+			# 	return 1
 
 		if action[1] == 'a':
 			return 0
@@ -235,8 +234,34 @@ def export(filepath):
 
 	with open(filepath, "r") as f:
 
-		points = [map(list, zip(*[map(lambda x: -1 if x == "~" else int(x), val.split(",")) for val in line.split("/")])) for line in f.read().split("\n")[1:-1]]
+		points = [map(list, zip(*[map(lambda x: x if x in ("~", "-") else int(x), val.split(",")) for val in line.split("/")])) for line in f.read().split("\n")[1:-1]]
 
+		for f in range(len(points)):
+			last_split = 0
+
+			for i in range(len(points[f])):
+				j = len(points[f]) - i - 1
+				if points[f][j] == ["-", "-"] or points[f][j] == ["~", "~"]:
+					last_split = j + 1 % len(points[f])
+					break
+
+			for i in range(len(points[f])):
+				if points[f][i] == ["~", "~"]:
+					points[f][i] = points[f][last_split]
+					points[f].insert(i + 1, ["-", "-"])
+					last_split = i + 1 % len(points[f])
+
+				elif points[f][i] == ["-", "-"]:
+					last_split = i + 1 % len(points[f])
+
+
+		for i in range(len(points)): 
+			points[i] = map(lambda x: [0, 0] if x == ["-", "-"] else x, points[i])	
+
+
+	pause()
+
+	# make sure everything fits within the range of PWM's the Arduino uses
 	minpoint = [10000, 10000]
 	maxpoint = [0, 0]
 
@@ -248,25 +273,45 @@ def export(filepath):
 				maxpoint[0] = max(point[0], maxpoint[0])
 				maxpoint[1] = max(point[1], maxpoint[1])
 
-	print points
 
-	margin = minpoint
-	bottomright = add_tuple(minpoint, maxpoint)
+	margin = (30, 30)
+	topleft = subtract_tuple(minpoint, margin)
+	bottomright = add_tuple(maxpoint, margin)
 
-	
-	print bottomright
-
-	scalex, scaley = CK_DIVS/float(bottomright[0]), CK_DIVS/float(bottomright[1])
-
-	print scalex, scaley
+	scalex, scaley = CK_DIVS/float(bottomright[0] - topleft[0]), CK_DIVS/float(bottomright[1] - topleft[1])
 
 	for line in range(len(points)):
 		for i in range(len(points[line])):
-			if not -1 in points[line][i]:
 
-				points[line][i][0] = int(points[line][i][0]*scalex)
-				points[line][i][1] = int(points[line][i][1]*scaley)
+			if 0 in points[line][i]:
+				points[line][i] = "0, 0"
+
+			else:
+				points[line][i] = str(int((topleft[0] + points[line][i][0])*scalex)) + ", " + str(int((bottomright[1] - points[line][i][1])*scaley))
 
 
-	for line in points:
-		print line
+	lengths = [len(i) for i in points]
+
+	max_len = max(lengths)
+
+	with open(CWD() + "\Oscilloscope_Drawer.ino", "r") as f:
+
+		segments = f.read().split("//~")
+
+	# if len(points) > 1:
+
+		frame_n_string = "#define FRAME_N " + str(len(points)) + "\n"
+
+		points_string = "unsigned char points[FRAME_N][" + str(max_len) + "][2] = {{" + "}, {".join( ( ("{" + "}, {".join(line) + "}") for line in points) ) + "}};\n"
+		
+		lengths_string = "unsigned char lengths[FRAME_N] = {" + ", ".join(map(str, lengths)) + "};\n" 
+
+	# else:
+	# 	points_string = "unsigned char points[][2] = {" + "}, {".join( ( ("{" + "}, {".join(line) + "}") for line in points) ) + "};"
+
+
+	segments[1] = "//~\n" + frame_n_string + points_string + lengths_string + "//~"
+
+	with open(CWD() + "\Oscilloscope_Drawer.ino", "w") as f:
+
+		f.write("".join(segments))

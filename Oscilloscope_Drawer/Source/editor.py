@@ -17,11 +17,13 @@ from add_image import *
 
 
 ###############
-# Fix undo crashes
+# Fix various crashes :P
 #
-# Cancel selection on line toggle, point move/add, zoom/scroll change
+# Hold button that removes points / red & blue lines to visualise image
 #
-# Right click on tools window to hide all but top
+# delete points in selection tool
+#
+#	Mouse leaving window fix
 ###############
 
 
@@ -50,7 +52,7 @@ class Editor(object):
 		self.trace_rect = Rect((int(30)*SCALE(), int(80*SCALE())), (int(840*SCALE()), int(520*SCALE())))
 		self.zoom = 1.0
 		self.screen_pos = 0
-		self.display = pygame.display.set_mode((self.width, self.height))
+		self.display = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
 
 		self.whitewash = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
 		self.whitewash.fill((255, 255, 255, 120))
@@ -107,6 +109,8 @@ class Editor(object):
 		self.starttime = time.clock()
 		self.i = 0
 
+		self.clock = pygame.time.Clock()
+
 	def reset_input_req(self):
 
 		self.input_req = {"Action" : False,
@@ -114,15 +118,12 @@ class Editor(object):
 											"NoDrawlist" : []}
 
 	def handle_framerate(self):
-
-		time_dif = time.clock()-self.starttime
-		if time_dif < 0.03: time.sleep(0.033 - time_dif)
 		
-		time_dif_2 = time.clock()-self.starttime
-		framerate =  int(round(1/time_dif_2))
+		self.clock.tick(30)
+		
+		framerate = int(self.clock.get_fps())
 		self.texts['framerate'] = Text(self.large_font, str(framerate), (self.width, 53*SCALE()), background=None, align="right")
-		
-		self.starttime = time.clock()
+
 
 	def update(self):
 
@@ -252,6 +253,7 @@ class Editor(object):
 
 
 		if self.action[0] == 'zoom scrollbar':
+			self.toggle_select_type(True)
 
 			self.texts['info'] = Text(self.med_font, 'zoom = ' + str(self.zoom)[:4] + 'x', (3*SCALE(), 53*SCALE()))
 			
@@ -267,6 +269,7 @@ class Editor(object):
 
 
 		elif self.action[0] == 'up scrollbar':
+			self.toggle_select_type(True)
 
 			self.texts['info'] = Text(self.med_font, 'top left Y pos = ' + str(cf.rect.topleft[1])[:4], (3*SCALE(), 53*SCALE()))
 			
@@ -282,6 +285,7 @@ class Editor(object):
 
 
 		elif self.action[0] == 'across scrollbar':
+			self.toggle_select_type(True)
 
 			self.texts['info'] = Text(self.med_font, 'top left X pos = ' + str(cf.rect.topleft[0])[:4], (3*SCALE(), 53*SCALE()))
 			
@@ -319,6 +323,8 @@ class Editor(object):
 			if self.action[-2] == 'move point':
 				if not self.follow_mouse[0]: 
 					cf.record_change()
+					
+				self.toggle_select_type(True)
 
 				self.follow_mouse = ("trace point", self.action[-1], 'until click stops')
 				cf.move_point(self.mouse)
@@ -334,18 +340,21 @@ class Editor(object):
 
 			elif self.action[-1] == 'delete point':
 				cf.record_change()
+				self.toggle_select_type(True)
 
 				cf.delete_point('active')
 
 
 			elif self.action[-1] == 'add point':
 				cf.record_change()
+				self.toggle_select_type(True)
 
 				cf.add_point(cf.min_distance['next_point'], cf.min_distance['pos'], True)
 
 
 			elif self.action[-1] == 'toggle line':
 				cf.record_change()
+				self.toggle_select_type(True)
 				
 				cf.toggle_line(cf.min_distance['next_point'])
 
@@ -360,8 +369,7 @@ class Editor(object):
 			elif self.action[-1] == 'mutate selection':
 				# switch tools if not actually mutating
 
-				if any(len(i) > 0 for i in self.tool_buttons['mutate selection']):
-					self.tools_window.update_tool_buttons(self.tool_buttons['mutate selection'][0][0], 'make selection', self.tool_buttons['mutate selection'][0][1] if len(self.tool_buttons['mutate selection'][0]) > 1 else 'None')
+				self.toggle_select_type(True)
 
 
 			elif self.action[-3] == 'selection':
@@ -395,11 +403,7 @@ class Editor(object):
 
 			elif self.action[-1] == 'toggle select type':
 
-				if any(self.mod_key in i for i in self.tool_buttons['make selection']) or (self.mod_key == "None" and any(len(i) == 1 for i in self.tool_buttons['make selection'])):
-					self.tools_window.update_tool_buttons(self.tool_buttons['make selection'][0][0], 'mutate selection')
-
-				elif any(self.mod_key in i for i in self.tool_buttons['mutate selection']) or (self.mod_key == "None" and any(len(i) == 1 for i in self.tool_buttons['mutate selection'])):
-					self.tools_window.update_tool_buttons(self.tool_buttons['mutate selection'][0][0], 'make selection')
+				self.toggle_select_type()
 
 
 			elif self.action[-1] in ('grab & move', 'scroll up', 'scroll down', 'scroll right', 'scroll left', 'zoom in', 'zoom out'):
@@ -447,6 +451,11 @@ class Editor(object):
 
 		if self.action[0] == "image handler":
 
+			if self.action[1] == "exit window":
+				self.action = ("paste", "click")
+				self.reset_input_req()
+				self.imagehdl = False
+
 			if self.action[1] == "generate image point data":
 				cf.record_change()
 
@@ -468,7 +477,6 @@ class Editor(object):
 
 				self.action = ("paste", "click")
 				self.reset_input_req()
-
 				self.imagehdl = False
 
 
@@ -502,9 +510,7 @@ class Editor(object):
 			cf.record_change()
 
 			cf.selection = False
-			if any(len(i) > 0 for i in self.tool_buttons['mutate selection']):
-				self.tools_window.update_tool_buttons(self.tool_buttons['mutate selection'][0][0], 'make selection', self.tool_buttons['mutate selection'][0][1] if len(self.tool_buttons['mutate selection'][0]) > 1 else 'None')
-
+			self.toggle_select_type(True)
 
 
 		elif self.action[0] == 'grid':
@@ -596,17 +602,10 @@ class Editor(object):
 		elif self.action[0] == 'export':
 
 			self.trace.save_file(CWD() + '\Traces\\' + self.name, self.name)
-			menu.export(self.name)
-			
-			error = export(directory + files[action[0]])
+			menu.export(CWD() + '\Traces\\' + self.name)
 
-			if error == 0:
-				pause = raw_input('Written successfully. Press enter to return to main menu...')
-				return 0
-			else:
-				pause = raw_input('Writing error: ' + str(error) + '. Press enter to return to main menu...')
-				return 1
-			
+			print 'Written successfully.'
+
 			time.sleep(0.2)
 
 		
@@ -649,8 +648,7 @@ class Editor(object):
 
 		for event in events:
 			if event.type == pygame.QUIT:
-				if any(len(i) > 0 for i in self.tool_buttons['mutate selection']):
-					self.tools_window.update_tool_buttons(self.tool_buttons['mutate selection'][0][0], 'make selection', self.tool_buttons['mutate selection'][0][1] if len(self.tool_buttons['mutate selection'][0]) > 1 else 'None')
+				self.toggle_select_type(True)
 				self.local_settings_write()
 				exit(0)
 
@@ -775,6 +773,25 @@ class Editor(object):
 			else:
 				self.tool_buttons[key] = [convert_str_list_to_list(value)]
 
+
+
+	def toggle_select_type(self, force_make=False):
+
+		if force_make:
+			self.tools_window.update(toggle_select="force make")
+			self.tool_buttons = self.tools_window.tool_buttons
+			self.trace.get_cf().update_selection("stop select")
+
+		else:
+			if any(self.mod_key in i for i in self.tool_buttons['make selection']) or (self.mod_key == "None" and any(len(i) == 1 for i in self.tool_buttons['make selection'])):
+				self.tools_window.update_tool_buttons(self.tool_buttons['make selection'][0][0], 'mutate selection')
+
+			elif any(self.mod_key in i for i in self.tool_buttons['mutate selection']) or (self.mod_key == "None" and any(len(i) == 1 for i in self.tool_buttons['mutate selection'])):
+				self.tools_window.update_tool_buttons(self.tool_buttons['mutate selection'][0][0], 'make selection')
+
+
+
+
 	# write to local settings file
 
 	def local_settings_write(self):
@@ -860,19 +877,31 @@ class Editor(object):
 										   scrollbar_frames.id : scrollbar_frames}
 
 	def buttons_init(self, directory):
-		self.buttons = {'save' : Button((4*SCALE(), 4*SCALE()), directory + 'save_button.png'),
-										'grid' : Cyclic_Button((48*SCALE(), 4*SCALE()), self.grid_types.index(self.settings['grid type']), directory + 'grid_button_1.png', directory + 'grid_button_2.png', directory + 'grid_button_3.png'),
-										'deselect' : Button((92*SCALE(), 4*SCALE()), directory + 'deselect_button.png'),
-										'cut' : Button((136*SCALE(), 4*SCALE()), directory + 'cut_button.png'),
-										'copy' : Button((180*SCALE(), 4*SCALE()), directory + 'copy_button.png'),
-										'paste' : Button((224*SCALE(), 4*SCALE()), directory + 'paste_button.png'),
-										'undo' : Button((268*SCALE(), 4*SCALE()), directory + 'undo_button.png'),
-										'redo' : Button((312*SCALE(), 4*SCALE()), directory + 'redo_button.png'),
-										'insert image' : Button((356*SCALE(), 4*SCALE()), directory + 'insert_image_button.png'),
-										'export' : Button((766*SCALE(), 4*SCALE()), directory + 'export_button.png'),
-										'help' : Button((810*SCALE(), 4*SCALE()), directory + 'help_button.png'),
-										'show point pos' : Button((854*SCALE(), 4*SCALE()), directory + 'show_point_pos_button.png') }
+
+		button_data1 = (("save", "save_button"), ("grid", "grid_button", 3),  ("deselect", "deselect_button"), ("cut", "cut_button"),
+										("copy", "copy_button"), ("paste", "paste_button"), ("undo", "undo_button"), ("redo", "redo_button"), ("insert image", "insert_image_button"))
 		
+		button_data2 = (("help", "help_button"), ("show point pos", "show_point_pos_button"), ("export", "export_button"))
+
+		self.buttons = {}
+
+		for i in range(len(button_data1)):
+			if len(button_data1[i]) > 2:
+				if i == 2:
+					self.buttons[button_data1[i][0]] = Cyclic_Button((4*SCALE() + i*44*SCALE(), 4*SCALE()), self.grid_types.index(self.settings['grid type']), *(directory + button_data1[i][1] + "_" + str(j+1) + ".png" for j in range(button_data1[i][2])))
+
+				else:
+					self.buttons[button_data1[i][0]] = Cyclic_Button((4*SCALE() + i*44*SCALE(), 4*SCALE()), 0, *(directory + button_data1[i][1] + "_" + str(j+1) + ".png" for j in range(button_data1[i][2])))
+			
+			else:
+				self.buttons[button_data1[i][0]] = Button((4*SCALE() + i*44*SCALE(), 4*SCALE()), directory + button_data1[i][1] + ".png")
+
+		for i in range(len(button_data2)):
+			if len(button_data2[i]) > 2:
+				self.buttons[button_data2[i][0]] = Cyclic_Button((4*SCALE() - i*44*SCALE(), 4*SCALE()), 0, *(directory + button_data2[i][1] + "_" + str(j+1) + ".png" for j in range(button_data2[i][2])))
+			else:
+				self.buttons[button_data2[i][0]] = Button((854*SCALE() - i*44*SCALE(), 4*SCALE()), directory + button_data2[i][1] + ".png")
+
 		for button in self.buttons:
 			self.buttons[button].load(id=button, scale=SCALE())
 

@@ -26,6 +26,7 @@ class Tools_Window(object):
 		self.overlays = overlays
 		self.tool_buttons = {tool : (tool_buttons[tool] if tool in tool_buttons else []) for tool in self.tools}
 		self.mod_key = 'None'
+
 		self.allowed_tool_combinations = [['add point', 'move point'], 
 																		  ['add point', 'delete point'],
 																		  ['delete point', 'toggle line'],
@@ -44,17 +45,26 @@ class Tools_Window(object):
 		
 		self.header_text = Text(font, 'TOOLS', (0, 0), background=False, lifetime=None)
 
-		self.surface = pygame.Surface(map(int, scaleup(self.row_length * 34 + 30, self.col_length * 34 + self.header_text.rect.height/SCALE() + 18)))
+		self.surface_size = map(int, scaleup(self.row_length * 34 + 30, self.col_length * 34 + self.header_text.rect.height/SCALE() + 18))
+		self.surface = pygame.Surface(self.surface_size)
+
 		self.rect = self.surface.get_rect()
 		self.rect.topleft = self.pos
+
 		self.header_rect = Rect((0, 0), (self.rect.width, (self.header_text.rect.height + 2)/SCALE()))
 		self.header_text.rect.topleft = ((self.rect.width - self.header_text.rect.width)/2.0, self.header_rect.height/2)	
+
 		self.scrollbar = Scrollbar((self.row_length * 34 + 2, self.header_rect.height + 2), 0, Button((0, 0), directory + 'scrollbar_arrow.png', type='on_mouse_down'),
 																																												   Sprite((0, 28), directory + 'scrollbar_tool_bar.png'),
 																																												   Button((0, self.col_length * 34 - 26), directory + 'scrollbar_arrow.png', type='on_mouse_down'))
+	
+
 		self.hover = False
 		self.active = False
 		self.mouse_pos = (0, 0)
+
+		self.dropdown = True
+		
 		self.tools_rect = Rect(scaleup(2, self.header_rect.height + 4), scaleup(self.row_length * 34 - 2, self.col_length * 34 - 2))
 		self.tools_range = SCALE() * 34 * ((len(self.tools) + 1) / 2)
 
@@ -66,6 +76,7 @@ class Tools_Window(object):
 			self.len_percent = 1.0
 
 	def load(self):
+
 		for tool in self.tools:
 			self.tools[tool].load(scale=SCALE(), id=tool)
 			row_pos = self.tools[tool].tool_no % 2
@@ -83,15 +94,15 @@ class Tools_Window(object):
 
 		self.mod_keys_bar.load(scale=SCALE())
 
-	def update(self, mod_key, **kwargs):
+	def update(self, mod_key=None, **kwargs):
 
 		self.displace = (self.scrollbar.sprites[-1].percent / 100) * (self.len_percent - 1) * (self.tools_rect.height + 2)
 		
-		if self.mod_key != mod_key:
+		if self.mod_key != mod_key and mod_key!=None:
 			for tool in self.tools:
 				self.tools[tool].load(scale=SCALE(), id=tool)
 
-		self.mod_key = mod_key
+		if mod_key != None: self.mod_key = mod_key
 
 		for tool in self.tools:
 			row_pos = self.tools[tool].tool_no % 2
@@ -103,6 +114,18 @@ class Tools_Window(object):
 
 		if 'set_tool' in kwargs:
 			self.update_tool_buttons(*kwargs['set_tool'])
+
+		if "toggle_select" in kwargs:
+			if kwargs["toggle_select"] == "force make":
+				
+				if self.tool_buttons["mutate selection"] != []:
+					comb = self.tool_buttons["mutate selection"][0]
+					if len(comb) > 1:
+						mod = comb[-1]
+					else:
+						mod = False
+					self.update_tool_buttons(comb[0], "make selection", mod)
+
 
 	def check_active(self, mouse):
 
@@ -119,21 +142,38 @@ class Tools_Window(object):
 			if mouse['Ldown']:
 				self.mouse_pos = subtract_tuple(mouse['pos'], self.rect.topleft)
 
-		self.scrollbar.check_active(adjusted_mouse)
 
-		self.hover = self.scrollbar.hover
+		adjusted_hdr_rect = Rect((0, 0), (self.header_rect.width, (self.header_rect.height + 2)*SCALE() + 1))
+		if adjusted_hdr_rect.collidepoint(adjusted_mouse['pos']) and mouse['Rdown']:
+			if self.dropdown:
+				self.dropdown = False
+				self.surface = pygame.Surface(adjusted_hdr_rect.size)
 
-		for tool in self.tools:
+			else:
+				self.dropdown = True
+				self.surface = pygame.Surface(self.surface_size)
 
-			self.tools[tool].check_active(adjusted_mouse, clip=self.tools_rect)
+			return
 
-			if self.tools[tool].Lactive:
-				self.update_tool_buttons('Lmouse', tool)
-			elif self.tools[tool].Ractive:
-				self.update_tool_buttons('Rmouse', tool)
 
-			if self.tools[tool].hover:
-				self.hover = True
+
+		if self.dropdown:
+
+			self.scrollbar.check_active(adjusted_mouse)
+
+			self.hover = self.scrollbar.hover
+
+			for tool in self.tools:
+
+				self.tools[tool].check_active(adjusted_mouse, clip=self.tools_rect)
+
+				if self.tools[tool].Lactive:
+					self.update_tool_buttons('Lmouse', tool)
+				elif self.tools[tool].Ractive:
+					self.update_tool_buttons('Rmouse', tool)
+
+				if self.tools[tool].hover:
+					self.hover = True
 
 	def move(self, mouse):
 
@@ -291,29 +331,37 @@ class Tools_Window(object):
 	def draw(self, display):
 
 		self.surface.fill((200, 200, 200))
-		pygame.draw.rect(self.surface, (68, 68, 68), ((0, 0), (self.rect.width, SCALE()*(self.header_rect.height + 2))), int(SCALE()))
-		pygame.draw.rect(self.surface, (153, 153, 153), (scaleup(1, 1), (self.rect.width - SCALE()*2, SCALE()*self.header_rect.height)), int(SCALE()))
-		pygame.draw.rect(self.surface, (68, 68, 68), (scaleup(0, self.header_rect.height + 2), scaleup(self.row_length * 34 + 2, self.col_length * 34 + 2)), int(SCALE()))
-		pygame.draw.rect(self.surface, (153, 153, 153), (scaleup(1, self.header_rect.height + 3), scaleup(self.row_length * 34, self.col_length * 34)), int(SCALE()))
-		pygame.draw.rect(self.surface, (68, 68, 68), ((0, self.rect.height - SCALE()*14), (self.rect.width, SCALE()*14)), int(SCALE()))
-		pygame.draw.rect(self.surface, (153, 153, 153), ((SCALE(), self.rect.height - SCALE()*13), (self.rect.width - 2*SCALE(), SCALE()*12)), int(SCALE()))
-		
+
+
+		if self.dropdown:
+
+			pygame.draw.rect(self.surface, (68, 68, 68), (scaleup(0, self.header_rect.height + 2), scaleup(self.row_length * 34 + 2, self.col_length * 34 + 2)), int(SCALE()))
+			pygame.draw.rect(self.surface, (153, 153, 153), (scaleup(1, self.header_rect.height + 3), scaleup(self.row_length * 34, self.col_length * 34)), int(SCALE()))
+			pygame.draw.rect(self.surface, (68, 68, 68), ((0, self.rect.height - SCALE()*14), (self.rect.width, SCALE()*14)), int(SCALE()))
+			pygame.draw.rect(self.surface, (153, 153, 153), ((SCALE(), self.rect.height - SCALE()*13), (self.rect.width - 2*SCALE(), SCALE()*12)), int(SCALE()))
+			
+			
+
+			self.tools_draw()
+
+			self.scrollbar.draw(self.surface)
+
+			self.mod_keys_bar.draw(self.surface)
+
+			if self.mod_key == 'None':
+				pygame.draw.rect(self.surface, (0, 255, 0), (self.mod_keys_bar.rect.topleft, scaleup(25, 14)), 1)		
+			elif self.mod_key == 'ctrl':
+				pygame.draw.rect(self.surface, (0, 255, 0), (add_tuple(self.mod_keys_bar.rect.topleft, scaleup(25, 0)), scaleup(25, 14)), 1)
+			elif self.mod_key == 'alt':
+				pygame.draw.rect(self.surface, (0, 255, 0), (add_tuple(self.mod_keys_bar.rect.topleft, scaleup(49, 0)), scaleup(25, 14)), 1)
+			elif self.mod_key == 'shift':
+				pygame.draw.rect(self.surface, (0, 255, 0), (add_tuple(self.mod_keys_bar.rect.topleft, scaleup(73, 0)), scaleup(25, 14)), 1)
+
+
+
+		pygame.draw.rect(self.surface, (68, 68, 68), ((0, 0), (self.rect.width - 1, SCALE()*(self.header_rect.height + 2))), int(SCALE()*1.5))
+		pygame.draw.rect(self.surface, (153, 153, 153), (scaleup(1, 1), (self.rect.width - SCALE()*2 - 1, SCALE()*self.header_rect.height)), int(SCALE()))
 		self.header_text.draw(self.surface)
-
-		self.tools_draw()
-
-		self.scrollbar.draw(self.surface)
-
-		self.mod_keys_bar.draw(self.surface)
-
-		if self.mod_key == 'None':
-			pygame.draw.rect(self.surface, (0, 255, 0), (self.mod_keys_bar.rect.topleft, scaleup(25, 14)), 1)		
-		elif self.mod_key == 'ctrl':
-			pygame.draw.rect(self.surface, (0, 255, 0), (add_tuple(self.mod_keys_bar.rect.topleft, scaleup(25, 0)), scaleup(25, 14)), 1)
-		elif self.mod_key == 'alt':
-			pygame.draw.rect(self.surface, (0, 255, 0), (add_tuple(self.mod_keys_bar.rect.topleft, scaleup(49, 0)), scaleup(25, 14)), 1)
-		elif self.mod_key == 'shift':
-			pygame.draw.rect(self.surface, (0, 255, 0), (add_tuple(self.mod_keys_bar.rect.topleft, scaleup(73, 0)), scaleup(25, 14)), 1)
 
 		display.blit(self.surface, self.rect.topleft)
 		

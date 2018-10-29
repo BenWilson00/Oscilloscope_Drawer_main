@@ -1,5 +1,5 @@
 # Oscilloscope_Drawer_main
-Drawing program... For oscilloscopes
+Drawing program for oscilloscopes.
 
 This is a program for sketching out the points in a trace,
 which will then be written to an arduino file,
